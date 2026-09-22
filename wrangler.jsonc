@@ -1,0 +1,5 @@
+{
+  "name": "findly-v3-api",
+  "main": "worker.js",
+  "compatibility_date": "2026-09-21"
+}
