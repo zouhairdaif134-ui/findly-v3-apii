@@ -2,33 +2,60 @@ export default {
   async fetch(request, env) {
     const url = new URL(request.url);
 
+    // Health check
     if (url.pathname === "/" || url.pathname === "/api/health") {
       return Response.json({
         status: "ok",
         project: "FINDLY V3",
-        service: "API"
+        service: "API",
+        message: "FINDLY V3 API is running"
       });
     }
 
+    // Supabase connection test
     if (url.pathname === "/api/test-supabase") {
       try {
+        // Check required environment variables
+        if (!env.SUPABASE_URL) {
+          return Response.json(
+            {
+              status: "error",
+              message: "SUPABASE_URL is missing"
+            },
+            { status: 500 }
+          );
+        }
+
+        if (!env.SUPABASE_SECRET_KEY) {
+          return Response.json(
+            {
+              status: "error",
+              message: "SUPABASE_SECRET_KEY is missing"
+            },
+            { status: 500 }
+          );
+        }
+
         const response = await fetch(
-          `${env.SUPABASE_URL}/rest/v1/bots?select=id,name&limit=1`,
+          `${env.SUPABASE_URL}/rest/v1/bots?select=id,name`,
           {
+            method: "GET",
             headers: {
               "apikey": env.SUPABASE_SECRET_KEY,
-              "Authorization": `Bearer ${env.SUPABASE_SECRET_KEY}`
+              "Authorization": `Bearer ${env.SUPABASE_SECRET_KEY}`,
+              "Content-Type": "application/json"
             }
           }
         );
 
-        const data = await response.json();
+        const responseText = await response.text();
 
         return Response.json({
           status: response.ok ? "ok" : "error",
           supabase_status: response.status,
-          data
+          response: responseText
         });
+
       } catch (error) {
         return Response.json(
           {
@@ -40,6 +67,7 @@ export default {
       }
     }
 
+    // Unknown endpoint
     return Response.json(
       {
         status: "error",
