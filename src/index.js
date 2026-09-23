@@ -40,10 +40,9 @@ export default {
           }
         );
 
-        const { data, error } = await supabase
-          .from("bots")
-          .select("id, name, slug, bot_type, is_active")
-          .order("sort_order", { ascending: true });
+        const { data, error, count } = await supabase
+  .from("bots")
+  .select("id", { count: "exact", head: true });
 
         if (error) {
           throw error;
@@ -52,8 +51,8 @@ export default {
         return Response.json({
           success: true,
           data: {
-            bots: data,
-            count: data.length
+          bots: [],
+          count
           },
           error: null
         });
