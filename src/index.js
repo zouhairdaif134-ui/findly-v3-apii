@@ -42,7 +42,7 @@ export default {
 
         const { data, error } = await supabase
           .from("bots")
-          .select("id, name, slug, bottype, is_active")
+          .select("id, name, slug, bot_type, is_active")
           .order("sort_order", { ascending: true });
 
         if (error) {
