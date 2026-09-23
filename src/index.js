@@ -28,6 +28,11 @@ export default {
           throw new Error("SUPABASE_SECRET_KEY is missing");
         }
 
+        const secretStatus = {
+          exists: Boolean(env.SUPABASE_SECRET_KEY),
+          length: env.SUPABASE_SECRET_KEY?.length ?? 0
+        };
+
         const supabase = createClient(
           env.SUPABASE_URL,
           env.SUPABASE_SECRET_KEY,
@@ -40,9 +45,12 @@ export default {
           }
         );
 
-        const { data, error, count } = await supabase
-  .from("bots")
-  .select("id", { count: "exact", head: true });
+        const { count, error } = await supabase
+          .from("bots")
+          .select("id", {
+            count: "exact",
+            head: true
+          });
 
         if (error) {
           throw error;
@@ -51,8 +59,9 @@ export default {
         return Response.json({
           success: true,
           data: {
-          bots: [],
-          count
+            secret: secretStatus,
+            bots: [],
+            count
           },
           error: null
         });
