@@ -37,7 +37,7 @@ export default {
         }
 
         const response = await fetch(
-          `${env.SUPABASE_URL}/rest/v1/bots?select=id,name`,
+          `${env.SUPABASE_URL}/rest/v1/bots?select=id,name&limit=1`,
           {
             method: "GET",
             headers: {
