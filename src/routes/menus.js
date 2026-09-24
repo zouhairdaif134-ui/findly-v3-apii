@@ -6,7 +6,7 @@ export async function getMenus(env, botSlug) {
   let query = supabase
     .from("menu_items")
     .select(
-      "id, bot_id, parent_id, title, slug, item_type, action, icon, sort_order, is_active"
+      "id, bot_id, parent_id, label, icon, action_type, action_value, is_active, sort_order, setings, created_at, updated_at"
     )
     .order("sort_order", { ascending: true });
 
