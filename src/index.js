@@ -1,5 +1,6 @@
 import { getBots } from "./routes/bots.js";
 import { getCategories } from "./routes/categories.js";
+import { getMenus } from "./routes/menus.js";
 import { success, failure } from "./lib/response.js";
 
 export default {
@@ -29,6 +30,18 @@ export default {
         request.method === "GET"
       ) {
         const data = await getCategories(env);
+
+        return success(data);
+      }
+
+      // Get menus
+      if (
+        url.pathname === "/api/menus" &&
+        request.method === "GET"
+      ) {
+        const botSlug = url.searchParams.get("bot");
+
+        const data = await getMenus(env, botSlug);
 
         return success(data);
       }
