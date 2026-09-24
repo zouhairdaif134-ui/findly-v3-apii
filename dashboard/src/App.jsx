@@ -21,6 +21,15 @@ const menu = [
 ];
 
 function App() {
+  const [session, setSession] = useState(null);
+  useEffect(() => {
+  supabase.auth.getSession().then(({ data }) => {
+    setSession(data.session);
+  });
+}, []);
+  if (!session) {
+  return <div>Login required</div>;
+  }
   const [bots, setBots] = useState([]);
   const [categories, setCategories] = useState([]);
   const [users, setUsers] = useState([]);
