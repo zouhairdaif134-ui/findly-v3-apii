@@ -33,20 +33,33 @@ function App() {
   const [categories, setCategories] = useState([]);
   const [users, setUsers] = useState([]);
   const [content, setContent] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [apiError, setApiError] = useState("");
 
   useEffect(() => {
     let mounted = true;
 
     async function loadSession() {
-      const {
-        data: { session }
-      } = await supabase.auth.getSession();
+      try {
+        const {
+          data: { session }
+        } = await supabase.auth.getSession();
 
-      if (mounted) {
-        setSession(session);
-        setAuthLoading(false);
+        if (mounted) {
+          setSession(session);
+        }
+      } catch (error) {
+        console.error(error);
+
+        if (mounted) {
+          setLoginError(
+            error.message || "Failed to restore session"
+          );
+        }
+      } finally {
+        if (mounted) {
+          setAuthLoading(false);
+        }
       }
     }
 
@@ -76,16 +89,22 @@ function App() {
       setLoginLoading(true);
       setLoginError("");
 
-      const { error } = await supabase.auth.signInWithPassword({
-        email: email.trim(),
-        password
-      });
+      const cleanEmail = email.trim();
+
+      const { error } =
+        await supabase.auth.signInWithPassword({
+          email: cleanEmail,
+          password
+        });
 
       if (error) {
         throw error;
       }
+
+      setPassword("");
     } catch (error) {
       console.error(error);
+
       setLoginError(
         error.message || "Login failed"
       );
@@ -95,21 +114,41 @@ function App() {
   }
 
   async function handleLogout() {
-    await supabase.auth.signOut();
+    try {
+      setApiError("");
+
+      const { error } =
+        await supabase.auth.signOut();
+
+      if (error) {
+        throw error;
+      }
+    } catch (error) {
+      console.error(error);
+
+      setApiError(
+        error.message || "Logout failed"
+      );
+    }
   }
 
   async function fetchApi(endpoint) {
-    const response = await fetch(`${API_URL}${endpoint}`);
+    const response = await fetch(
+      `${API_URL}${endpoint}`
+    );
 
     if (!response.ok) {
-      throw new Error(`API ${response.status}`);
+      throw new Error(
+        `API ${response.status}`
+      );
     }
 
     const result = await response.json();
 
     if (!result.success) {
       throw new Error(
-        result.error?.message || "API error"
+        result.error?.message ||
+          "API error"
       );
     }
 
@@ -118,9 +157,15 @@ function App() {
 
   useEffect(() => {
     if (!session) {
+      setBots([]);
+      setCategories([]);
+      setUsers([]);
+      setContent([]);
       setLoading(false);
       return;
     }
+
+    let mounted = true;
 
     async function loadDashboard() {
       try {
@@ -139,92 +184,119 @@ function App() {
           fetchApi("/api/content")
         ]);
 
+        if (!mounted) {
+          return;
+        }
+
         setBots(botsData);
         setCategories(categoriesData);
         setUsers(usersData);
         setContent(contentData);
       } catch (error) {
         console.error(error);
-        setApiError(
-          error.message || "Failed to load API"
-        );
+
+        if (mounted) {
+          setApiError(
+            error.message ||
+              "Failed to load API"
+          );
+        }
       } finally {
-        setLoading(false);
+        if (mounted) {
+          setLoading(false);
+        }
       }
     }
 
     loadDashboard();
+
+    return () => {
+      mounted = false;
+    };
   }, [session]);
 
   if (authLoading) {
     return (
-      <div className="app">
-        <main className="main">
-          <div className="empty">
-            Loading...
-          </div>
-        </main>
+      <div className="auth-page">
+        <section className="auth-card">
+          <h1>FINDLY ADMIN</h1>
+          <p>
+            Checking secure session...
+          </p>
+        </section>
       </div>
     );
   }
 
   if (!session) {
     return (
-      <div className="app">
-        <main className="main">
-          <section className="panel">
-            <div className="panel-header">
-              <div>
-                <h1>FINDLY ADMIN</h1>
-                <p>Secure administrator login</p>
-              </div>
+      <div className="auth-page">
+        <section className="auth-card">
+          <h1>FINDLY ADMIN</h1>
+
+          <p>
+            Sign in to access the control center.
+          </p>
+
+          <form
+            className="auth-form"
+            onSubmit={handleLogin}
+          >
+            <div className="auth-field">
+              <label htmlFor="email">
+                Email
+              </label>
+
+              <input
+                id="email"
+                type="email"
+                value={email}
+                onChange={(event) =>
+                  setEmail(event.target.value)
+                }
+                placeholder="Enter your email"
+                autoComplete="email"
+                required
+              />
             </div>
 
-            <form onSubmit={handleLogin}>
-              <div>
-                <label>Email</label>
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(event) =>
-                    setEmail(event.target.value)
-                  }
-                  placeholder="Enter your email"
-                  required
-                />
+            <div className="auth-field">
+              <label htmlFor="password">
+                Password
+              </label>
+
+              <input
+                id="password"
+                type="password"
+                value={password}
+                onChange={(event) =>
+                  setPassword(
+                    event.target.value
+                  )
+                }
+                placeholder="Enter your password"
+                autoComplete="current-password"
+                required
+              />
+            </div>
+
+            {loginError && (
+              <div className="auth-error">
+                {loginError}
               </div>
+            )}
 
-              <div>
-                <label>Password</label>
-                <input
-                  type="password"
-                  value={password}
-                  onChange={(event) =>
-                    setPassword(event.target.value)
-                  }
-                  placeholder="Enter your password"
-                  required
-                />
-              </div>
-
-              {loginError && (
-                <div className="error-box">
-                  {loginError}
-                </div>
-              )}
-
-              <button
-                className="secondary-button"
-                type="submit"
-                disabled={loginLoading}
-              >
-                {loginLoading
-                  ? "Signing in..."
-                  : "Sign In"}
-              </button>
-            </form>
-          </section>
-        </main>
+            <button
+              className="auth-button"
+              type="submit"
+              disabled={loginLoading}
+            >
+              {loginLoading
+                ? "Signing in..."
+                : "Sign In"}
+            </button>
+          </form>
+        </section>
       </div>
     );
   }
@@ -233,7 +305,9 @@ function App() {
     <div className="app">
       <aside className="sidebar">
         <div className="brand">
-          <div className="brand-icon">F</div>
+          <div className="brand-icon">
+            F
+          </div>
 
           <div>
             <strong>FINDLY</strong>
@@ -246,7 +320,9 @@ function App() {
             <button
               key={item.label}
               className={`nav-item ${
-                item.active ? "active" : ""
+                item.active
+                  ? "active"
+                  : ""
               }`}
               type="button"
             >
@@ -262,7 +338,9 @@ function App() {
 
             <div>
               <strong>Owner</strong>
-              <small>Full Access</small>
+              <small>
+                Full Access
+              </small>
             </div>
           </div>
         </div>
@@ -272,7 +350,9 @@ function App() {
         <header className="header">
           <div>
             <h1>Overview</h1>
-            <p>FINDLY control center</p>
+            <p>
+              FINDLY control center
+            </p>
           </div>
 
           <div className="header-actions">
@@ -284,11 +364,18 @@ function App() {
             </button>
 
             <div className="profile">
-              <div className="avatar">F</div>
+              <div className="avatar">
+                F
+              </div>
 
               <div>
-                <strong>FINDLY Owner</strong>
-                <small>{session.user.email}</small>
+                <strong>
+                  FINDLY Owner
+                </strong>
+
+                <small>
+                  {session.user.email}
+                </small>
               </div>
             </div>
 
@@ -312,25 +399,41 @@ function App() {
           <StatCard
             icon="🤖"
             label="Bots"
-            value={loading ? "…" : bots.length}
+            value={
+              loading
+                ? "…"
+                : bots.length
+            }
           />
 
           <StatCard
             icon="🗂️"
             label="Categories"
-            value={loading ? "…" : categories.length}
+            value={
+              loading
+                ? "…"
+                : categories.length
+            }
           />
 
           <StatCard
             icon="👥"
             label="Users"
-            value={loading ? "…" : users.length}
+            value={
+              loading
+                ? "…"
+                : users.length
+            }
           />
 
           <StatCard
             icon="🗃️"
             label="Content"
-            value={loading ? "…" : content.length}
+            value={
+              loading
+                ? "…"
+                : content.length
+            }
           />
         </section>
 
@@ -339,7 +442,9 @@ function App() {
             <div className="panel-header">
               <div>
                 <h2>Bots</h2>
-                <p>Connected FINDLY bots</p>
+                <p>
+                  Connected FINDLY bots
+                </p>
               </div>
 
               <button
@@ -357,11 +462,12 @@ function App() {
                 </div>
               )}
 
-              {!loading && bots.length === 0 && (
-                <div className="empty">
-                  No bots found
-                </div>
-              )}
+              {!loading &&
+                bots.length === 0 && (
+                  <div className="empty">
+                    No bots found
+                  </div>
+                )}
 
               {!loading &&
                 bots.map((bot) => (
@@ -374,7 +480,9 @@ function App() {
                     </div>
 
                     <div className="bot-info">
-                      <strong>{bot.name}</strong>
+                      <strong>
+                        {bot.name}
+                      </strong>
 
                       <span>
                         {bot.telegram_username ||
@@ -404,7 +512,9 @@ function App() {
             <div className="panel-header">
               <div>
                 <h2>Categories</h2>
-                <p>Current FINDLY network</p>
+                <p>
+                  Current FINDLY network
+                </p>
               </div>
 
               <button
@@ -416,41 +526,45 @@ function App() {
             </div>
 
             <div className="category-list">
-              {categories.map((category) => (
-                <div
-                  className="category-row"
-                  key={category.id}
-                >
-                  <span className="category-icon">
-                    {category.icon || "📁"}
-                  </span>
-
-                  <div>
-                    <strong>
-                      {category.name}
-                    </strong>
-
-                    <small>
-                      {category.slug}
-                    </small>
-                  </div>
-
-                  <span
-                    className={
-                      category.is_active
-                        ? "active-label"
-                        : "inactive-label"
-                    }
+              {categories.map(
+                (category) => (
+                  <div
+                    className="category-row"
+                    key={category.id}
                   >
-                    {category.is_active
-                      ? "Active"
-                      : "Inactive"}
-                  </span>
-                </div>
-              ))}
+                    <span className="category-icon">
+                      {category.icon ||
+                        "📁"}
+                    </span>
+
+                    <div>
+                      <strong>
+                        {category.name}
+                      </strong>
+
+                      <small>
+                        {category.slug}
+                      </small>
+                    </div>
+
+                    <span
+                      className={
+                        category.is_active
+                          ? "active-label"
+                          : "inactive-label"
+                      }
+                    >
+                      {category.is_active
+                        ? "Active"
+                        : "Inactive"}
+                    </span>
+                  </div>
+                )
+              )}
 
               {!loading &&
-                categories.length === 0 && (
+                categories.length ===
+                  0 && (
                   <div className="empty">
                     No categories found
                   </div>
@@ -462,7 +576,10 @@ function App() {
         <section className="panel system-panel">
           <div className="panel-header">
             <div>
-              <h2>System Status</h2>
+              <h2>
+                System Status
+              </h2>
+
               <p>
                 Current FINDLY infrastructure
               </p>
@@ -496,10 +613,16 @@ function App() {
   );
 }
 
-function StatCard({ icon, label, value }) {
+function StatCard({
+  icon,
+  label,
+  value
+}) {
   return (
     <div className="stat-card">
-      <div className="stat-icon">{icon}</div>
+      <div className="stat-icon">
+        {icon}
+      </div>
 
       <div>
         <span>{label}</span>
@@ -509,7 +632,10 @@ function StatCard({ icon, label, value }) {
   );
 }
 
-function SystemItem({ label, value }) {
+function SystemItem({
+  label,
+  value
+}) {
   return (
     <div className="system-item">
       <div>
