@@ -1,4 +1,5 @@
 import { getBots } from "./routes/bots.js";
+import { getCategories } from "./routes/categories.js";
 import { success, failure } from "./lib/response.js";
 
 export default {
@@ -18,6 +19,16 @@ export default {
       // Get all bots
       if (url.pathname === "/api/bots" && request.method === "GET") {
         const data = await getBots(env);
+
+        return success(data);
+      }
+
+      // Get all categories
+      if (
+        url.pathname === "/api/categories" &&
+        request.method === "GET"
+      ) {
+        const data = await getCategories(env);
 
         return success(data);
       }
