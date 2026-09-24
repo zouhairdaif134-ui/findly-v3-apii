@@ -22,20 +22,81 @@ const menu = [
 
 function App() {
   const [session, setSession] = useState(null);
-  useEffect(() => {
-  supabase.auth.getSession().then(({ data }) => {
-    setSession(data.session);
-  });
-}, []);
-  if (!session) {
-  return <div>Login required</div>;
-  }
+  const [authLoading, setAuthLoading] = useState(true);
+
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [loginLoading, setLoginLoading] = useState(false);
+  const [loginError, setLoginError] = useState("");
+
   const [bots, setBots] = useState([]);
   const [categories, setCategories] = useState([]);
   const [users, setUsers] = useState([]);
   const [content, setContent] = useState([]);
   const [loading, setLoading] = useState(true);
   const [apiError, setApiError] = useState("");
+
+  useEffect(() => {
+    let mounted = true;
+
+    async function loadSession() {
+      const {
+        data: { session }
+      } = await supabase.auth.getSession();
+
+      if (mounted) {
+        setSession(session);
+        setAuthLoading(false);
+      }
+    }
+
+    loadSession();
+
+    const {
+      data: { subscription }
+    } = supabase.auth.onAuthStateChange(
+      (_event, session) => {
+        if (mounted) {
+          setSession(session);
+          setAuthLoading(false);
+        }
+      }
+    );
+
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
+  }, []);
+
+  async function handleLogin(event) {
+    event.preventDefault();
+
+    try {
+      setLoginLoading(true);
+      setLoginError("");
+
+      const { error } = await supabase.auth.signInWithPassword({
+        email: email.trim(),
+        password
+      });
+
+      if (error) {
+        throw error;
+      }
+    } catch (error) {
+      console.error(error);
+      setLoginError(
+        error.message || "Login failed"
+      );
+    } finally {
+      setLoginLoading(false);
+    }
+  }
+
+  async function handleLogout() {
+    await supabase.auth.signOut();
+  }
 
   async function fetchApi(endpoint) {
     const response = await fetch(`${API_URL}${endpoint}`);
@@ -47,13 +108,20 @@ function App() {
     const result = await response.json();
 
     if (!result.success) {
-      throw new Error(result.error?.message || "API error");
+      throw new Error(
+        result.error?.message || "API error"
+      );
     }
 
     return result.data || [];
   }
 
   useEffect(() => {
+    if (!session) {
+      setLoading(false);
+      return;
+    }
+
     async function loadDashboard() {
       try {
         setLoading(true);
@@ -77,20 +145,96 @@ function App() {
         setContent(contentData);
       } catch (error) {
         console.error(error);
-        setApiError(error.message || "Failed to load API");
+        setApiError(
+          error.message || "Failed to load API"
+        );
       } finally {
         setLoading(false);
       }
     }
 
     loadDashboard();
-  }, []);
+  }, [session]);
+
+  if (authLoading) {
+    return (
+      <div className="app">
+        <main className="main">
+          <div className="empty">
+            Loading...
+          </div>
+        </main>
+      </div>
+    );
+  }
+
+  if (!session) {
+    return (
+      <div className="app">
+        <main className="main">
+          <section className="panel">
+            <div className="panel-header">
+              <div>
+                <h1>FINDLY ADMIN</h1>
+                <p>Secure administrator login</p>
+              </div>
+            </div>
+
+            <form onSubmit={handleLogin}>
+              <div>
+                <label>Email</label>
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(event) =>
+                    setEmail(event.target.value)
+                  }
+                  placeholder="Enter your email"
+                  required
+                />
+              </div>
+
+              <div>
+                <label>Password</label>
+                <input
+                  type="password"
+                  value={password}
+                  onChange={(event) =>
+                    setPassword(event.target.value)
+                  }
+                  placeholder="Enter your password"
+                  required
+                />
+              </div>
+
+              {loginError && (
+                <div className="error-box">
+                  {loginError}
+                </div>
+              )}
+
+              <button
+                className="secondary-button"
+                type="submit"
+                disabled={loginLoading}
+              >
+                {loginLoading
+                  ? "Signing in..."
+                  : "Sign In"}
+              </button>
+            </form>
+          </section>
+        </main>
+      </div>
+    );
+  }
 
   return (
     <div className="app">
       <aside className="sidebar">
         <div className="brand">
           <div className="brand-icon">F</div>
+
           <div>
             <strong>FINDLY</strong>
             <span>ADMIN</span>
@@ -115,6 +259,7 @@ function App() {
         <div className="sidebar-footer">
           <div className="owner-badge">
             <span>👑</span>
+
             <div>
               <strong>Owner</strong>
               <small>Full Access</small>
@@ -131,17 +276,29 @@ function App() {
           </div>
 
           <div className="header-actions">
-            <button className="icon-button" type="button">
+            <button
+              className="icon-button"
+              type="button"
+            >
               🔔
             </button>
 
             <div className="profile">
               <div className="avatar">F</div>
+
               <div>
                 <strong>FINDLY Owner</strong>
-                <small>Administrator</small>
+                <small>{session.user.email}</small>
               </div>
             </div>
+
+            <button
+              className="secondary-button"
+              type="button"
+              onClick={handleLogout}
+            >
+              Logout
+            </button>
           </div>
         </header>
 
@@ -185,7 +342,10 @@ function App() {
                 <p>Connected FINDLY bots</p>
               </div>
 
-              <button className="secondary-button" type="button">
+              <button
+                className="secondary-button"
+                type="button"
+              >
                 View All
               </button>
             </div>
@@ -205,13 +365,17 @@ function App() {
 
               {!loading &&
                 bots.map((bot) => (
-                  <div className="bot-row" key={bot.id}>
+                  <div
+                    className="bot-row"
+                    key={bot.id}
+                  >
                     <div className="bot-icon">
                       {bot.icon || "🤖"}
                     </div>
 
                     <div className="bot-info">
                       <strong>{bot.name}</strong>
+
                       <span>
                         {bot.telegram_username ||
                           bot.slug}
@@ -226,6 +390,7 @@ function App() {
                       }`}
                     >
                       <span />
+
                       {bot.is_active
                         ? "Active"
                         : "Paused"}
@@ -242,7 +407,10 @@ function App() {
                 <p>Current FINDLY network</p>
               </div>
 
-              <button className="secondary-button" type="button">
+              <button
+                className="secondary-button"
+                type="button"
+              >
                 Manage
               </button>
             </div>
@@ -258,8 +426,13 @@ function App() {
                   </span>
 
                   <div>
-                    <strong>{category.name}</strong>
-                    <small>{category.slug}</small>
+                    <strong>
+                      {category.name}
+                    </strong>
+
+                    <small>
+                      {category.slug}
+                    </small>
                   </div>
 
                   <span
@@ -276,11 +449,12 @@ function App() {
                 </div>
               ))}
 
-              {!loading && categories.length === 0 && (
-                <div className="empty">
-                  No categories found
-                </div>
-              )}
+              {!loading &&
+                categories.length === 0 && (
+                  <div className="empty">
+                    No categories found
+                  </div>
+                )}
             </div>
           </div>
         </section>
@@ -289,7 +463,9 @@ function App() {
           <div className="panel-header">
             <div>
               <h2>System Status</h2>
-              <p>Current FINDLY infrastructure</p>
+              <p>
+                Current FINDLY infrastructure
+              </p>
             </div>
           </div>
 
