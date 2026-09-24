@@ -6,7 +6,7 @@ export async function getUsers(env, botId = null) {
   let query = supabase
     .from("telegram_users")
     .select(
-      "uuid, telegram_user_id, username, first_name, last_name, language_code, is_active, first_seen_at, last_seen_at"
+      "id, telegram_user_id, username, first_name, last_name, language_code, is_active, first_seen_at, last_seen_at"
     )
     .order("last_seen_at", { ascending: false });
 
@@ -26,7 +26,7 @@ export async function getUsers(env, botId = null) {
       return [];
     }
 
-    query = query.in("uuid", userIds);
+    query = query.in("id", userIds);
   }
 
   const { data, error } = await query;
