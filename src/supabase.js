@@ -4,7 +4,7 @@ const SUPABASE_URL =
   "https://rcebarvpmpxsosclexyg.supabase.co";
 
 const SUPABASE_PUBLISHABLE_KEY =
-  "YOUR_PUBLISHABLE_KEY";
+  "sb_publishable_RKDieHYjjBXkT3iV7YlW5w_fND0QxaG";
 
 export const supabase = createClient(
   SUPABASE_URL,
