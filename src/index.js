@@ -3,6 +3,10 @@ import { getCategories } from "./routes/categories.js";
 import { getMenus } from "./routes/menus.js";
 import { getContent } from "./routes/content.js";
 import { getUsers } from "./routes/users.js";
+import { getFavorites } from "./routes/favorites.js";
+import { getNotifications } from "./routes/notifications.js";
+import { getAnalytics } from "./routes/analytics.js";
+import { getSettings } from "./routes/settings.js";
 import { success, failure } from "./lib/response.js";
 
 export default {
@@ -73,6 +77,66 @@ export default {
         const botId = url.searchParams.get("bot_id");
 
         const data = await getUsers(env, botId);
+
+        return success(data);
+      }
+
+      // Get favorites
+      if (
+        url.pathname === "/api/favorites" &&
+        request.method === "GET"
+      ) {
+        const userId = url.searchParams.get("user_id");
+
+        const data = await getFavorites(env, userId);
+
+        return success(data);
+      }
+
+      // Get notification subscriptions
+      if (
+        url.pathname === "/api/notifications" &&
+        request.method === "GET"
+      ) {
+        const userId = url.searchParams.get("user_id");
+        const botId = url.searchParams.get("bot_id");
+
+        const data = await getNotifications(
+          env,
+          userId,
+          botId
+        );
+
+        return success(data);
+      }
+
+      // Get analytics events
+      if (
+        url.pathname === "/api/analytics" &&
+        request.method === "GET"
+      ) {
+        const userId = url.searchParams.get("user_id");
+        const botId = url.searchParams.get("bot_id");
+        const eventType = url.searchParams.get("event_type");
+
+        const data = await getAnalytics(
+          env,
+          userId,
+          botId,
+          eventType
+        );
+
+        return success(data);
+      }
+
+      // Get bot settings
+      if (
+        url.pathname === "/api/settings" &&
+        request.method === "GET"
+      ) {
+        const botId = url.searchParams.get("bot_id");
+
+        const data = await getSettings(env, botId);
 
         return success(data);
       }
