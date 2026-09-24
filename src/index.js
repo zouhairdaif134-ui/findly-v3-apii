@@ -1,4 +1,5 @@
 import { getBots } from "./routes/bots.js";
+import { success, failure } from "./lib/response.js";
 
 export default {
   async fetch(request, env) {
@@ -6,15 +7,11 @@ export default {
 
     try {
       // Health check
-      if (url.pathname === "/health") {
-        return Response.json({
-          success: true,
-          data: {
-            service: "findly-v3-api",
-            version: "3.0.0",
-            status: "healthy"
-          },
-          error: null
+      if (url.pathname === "/health" && request.method === "GET") {
+        return success({
+          service: "findly-v3-api",
+          version: "3.0.0",
+          status: "healthy"
         });
       }
 
@@ -22,36 +19,22 @@ export default {
       if (url.pathname === "/api/bots" && request.method === "GET") {
         const data = await getBots(env);
 
-        return Response.json({
-          success: true,
-          data,
-          error: null
-        });
+        return success(data);
       }
 
-      return Response.json(
-        {
-          success: false,
-          data: null,
-          error: {
-            code: "NOT_FOUND",
-            message: "Endpoint not found"
-          }
-        },
-        { status: 404 }
+      return failure(
+        "NOT_FOUND",
+        "Endpoint not found",
+        404
       );
 
     } catch (error) {
-      return Response.json(
-        {
-          success: false,
-          data: null,
-          error: {
-            code: "API_ERROR",
-            message: error.message
-          }
-        },
-        { status: 500 }
+      console.error(error);
+
+      return failure(
+        "API_ERROR",
+        error.message || "Internal server error",
+        500
       );
     }
   }
