@@ -1,26 +1,10 @@
-import { createClient } from "@supabase/supabase-js";
+import { getBots } from "./routes/bots.js";
 
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
 
     try {
-      if (!env.SUPABASE_URL || !env.SUPABASE_SECRET_KEY) {
-        throw new Error("Supabase environment variables are missing");
-      }
-
-      const supabase = createClient(
-        env.SUPABASE_URL,
-        env.SUPABASE_SECRET_KEY,
-        {
-          auth: {
-            persistSession: false,
-            autoRefreshToken: false,
-            detectSessionInUrl: false
-          }
-        }
-      );
-
       // Health check
       if (url.pathname === "/health") {
         return Response.json({
@@ -36,16 +20,7 @@ export default {
 
       // Get all bots
       if (url.pathname === "/api/bots" && request.method === "GET") {
-        const { data, error } = await supabase
-          .from("bots")
-          .select(
-            "id, name, slug, bot_type, telegram_username, description, icon, is_active, sort_order"
-          )
-          .order("sort_order", { ascending: true });
-
-        if (error) {
-          throw error;
-        }
+        const data = await getBots(env);
 
         return Response.json({
           success: true,
