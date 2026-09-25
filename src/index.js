@@ -7,153 +7,448 @@ import { getFavorites } from "./routes/favorites.js";
 import { getNotifications } from "./routes/notifications.js";
 import { getAnalytics } from "./routes/analytics.js";
 import { getSettings } from "./routes/settings.js";
+import { authorizeRequest } from "./lib/auth.js";
 import { success, failure } from "./lib/response.js";
 
+const PERMISSIONS = {
+  bots: "bots.view",
+  categories: "categories.view",
+  menus: "menus.view",
+  content: "content.view",
+  users: "users.view",
+  favorites: "users.view",
+  notifications: "notifications.manage",
+  analytics: "analytics.view",
+  settings: "settings.manage"
+};
+
+function corsHeaders() {
+  return {
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Headers":
+      "Authorization, Content-Type",
+    "Access-Control-Allow-Methods":
+      "GET, POST, PUT, PATCH, DELETE, OPTIONS"
+  };
+}
+
+function withCors(response) {
+  const headers =
+    new Headers(response.headers);
+
+  const cors =
+    corsHeaders();
+
+  Object.entries(cors).forEach(
+    ([key, value]) => {
+      headers.set(key, value);
+    }
+  );
+
+  return new Response(
+    response.body,
+    {
+      status:
+        response.status,
+      statusText:
+        response.statusText,
+      headers
+    }
+  );
+}
+
+async function requirePermission(
+  env,
+  request,
+  permission
+) {
+  return authorizeRequest(
+    env,
+    request,
+    permission
+  );
+}
+
 export default {
-  async fetch(request, env) {
-    const url = new URL(request.url);
+  async fetch(
+    request,
+    env
+  ) {
+    const url =
+      new URL(request.url);
 
     try {
-      // Health check
-      if (url.pathname === "/health" && request.method === "GET") {
-        return success({
-          service: "findly-v3-api",
-          version: "3.0.0",
-          status: "healthy"
-        });
-      }
-
-      // Get all bots
-      if (url.pathname === "/api/bots" && request.method === "GET") {
-        const data = await getBots(env);
-
-        return success(data);
-      }
-
-      // Get all categories
       if (
-        url.pathname === "/api/categories" &&
-        request.method === "GET"
+        request.method ===
+        "OPTIONS"
       ) {
-        const data = await getCategories(env);
-
-        return success(data);
-      }
-
-      // Get menus
-      if (
-        url.pathname === "/api/menus" &&
-        request.method === "GET"
-      ) {
-        const botSlug = url.searchParams.get("bot");
-
-        const data = await getMenus(env, botSlug);
-
-        return success(data);
-      }
-
-      // Get content
-      if (
-        url.pathname === "/api/content" &&
-        request.method === "GET"
-      ) {
-        const botSlug = url.searchParams.get("bot");
-        const categorySlug = url.searchParams.get("category");
-
-        const data = await getContent(
-          env,
-          botSlug,
-          categorySlug
+        return withCors(
+          new Response(null, {
+            status: 204
+          })
         );
-
-        return success(data);
       }
 
-      // Get users
       if (
-        url.pathname === "/api/users" &&
-        request.method === "GET"
+        url.pathname ===
+          "/health" &&
+        request.method ===
+          "GET"
       ) {
-        const botId = url.searchParams.get("bot_id");
-
-        const data = await getUsers(env, botId);
-
-        return success(data);
-      }
-
-      // Get favorites
-      if (
-        url.pathname === "/api/favorites" &&
-        request.method === "GET"
-      ) {
-        const userId = url.searchParams.get("user_id");
-
-        const data = await getFavorites(env, userId);
-
-        return success(data);
-      }
-
-      // Get notification subscriptions
-      if (
-        url.pathname === "/api/notifications" &&
-        request.method === "GET"
-      ) {
-        const userId = url.searchParams.get("user_id");
-        const botId = url.searchParams.get("bot_id");
-
-        const data = await getNotifications(
-          env,
-          userId,
-          botId
+        return withCors(
+          success({
+            service:
+              "findly-v3-api",
+            version:
+              "3.0.0",
+            status:
+              "healthy"
+          })
         );
-
-        return success(data);
       }
 
-      // Get analytics events
       if (
-        url.pathname === "/api/analytics" &&
-        request.method === "GET"
+        url.pathname ===
+          "/api/bots" &&
+        request.method ===
+          "GET"
       ) {
-        const userId = url.searchParams.get("user_id");
-        const botId = url.searchParams.get("bot_id");
-        const eventType = url.searchParams.get("event_type");
+        const auth =
+          await requirePermission(
+            env,
+            request,
+            PERMISSIONS.bots
+          );
 
-        const data = await getAnalytics(
-          env,
-          userId,
-          botId,
-          eventType
+        if (auth.response) {
+          return withCors(
+            auth.response
+          );
+        }
+
+        const data =
+          await getBots(env);
+
+        return withCors(
+          success(data)
         );
-
-        return success(data);
       }
 
-      // Get bot settings
       if (
-        url.pathname === "/api/settings" &&
-        request.method === "GET"
+        url.pathname ===
+          "/api/categories" &&
+        request.method ===
+          "GET"
       ) {
-        const botId = url.searchParams.get("bot_id");
+        const auth =
+          await requirePermission(
+            env,
+            request,
+            PERMISSIONS.categories
+          );
 
-        const data = await getSettings(env, botId);
+        if (auth.response) {
+          return withCors(
+            auth.response
+          );
+        }
 
-        return success(data);
+        const data =
+          await getCategories(
+            env
+          );
+
+        return withCors(
+          success(data)
+        );
       }
 
-      return failure(
-        "NOT_FOUND",
-        "Endpoint not found",
-        404
+      if (
+        url.pathname ===
+          "/api/menus" &&
+        request.method ===
+          "GET"
+      ) {
+        const auth =
+          await requirePermission(
+            env,
+            request,
+            PERMISSIONS.menus
+          );
+
+        if (auth.response) {
+          return withCors(
+            auth.response
+          );
+        }
+
+        const botSlug =
+          url.searchParams.get(
+            "bot"
+          );
+
+        const data =
+          await getMenus(
+            env,
+            botSlug
+          );
+
+        return withCors(
+          success(data)
+        );
+      }
+
+      if (
+        url.pathname ===
+          "/api/content" &&
+        request.method ===
+          "GET"
+      ) {
+        const auth =
+          await requirePermission(
+            env,
+            request,
+            PERMISSIONS.content
+          );
+
+        if (auth.response) {
+          return withCors(
+            auth.response
+          );
+        }
+
+        const botSlug =
+          url.searchParams.get(
+            "bot"
+          );
+
+        const categorySlug =
+          url.searchParams.get(
+            "category"
+          );
+
+        const data =
+          await getContent(
+            env,
+            botSlug,
+            categorySlug
+          );
+
+        return withCors(
+          success(data)
+        );
+      }
+
+      if (
+        url.pathname ===
+          "/api/users" &&
+        request.method ===
+          "GET"
+      ) {
+        const auth =
+          await requirePermission(
+            env,
+            request,
+            PERMISSIONS.users
+          );
+
+        if (auth.response) {
+          return withCors(
+            auth.response
+          );
+        }
+
+        const botId =
+          url.searchParams.get(
+            "bot_id"
+          );
+
+        const data =
+          await getUsers(
+            env,
+            botId
+          );
+
+        return withCors(
+          success(data)
+        );
+      }
+
+      if (
+        url.pathname ===
+          "/api/favorites" &&
+        request.method ===
+          "GET"
+      ) {
+        const auth =
+          await requirePermission(
+            env,
+            request,
+            PERMISSIONS.favorites
+          );
+
+        if (auth.response) {
+          return withCors(
+            auth.response
+          );
+        }
+
+        const userId =
+          url.searchParams.get(
+            "user_id"
+          );
+
+        const data =
+          await getFavorites(
+            env,
+            userId
+          );
+
+        return withCors(
+          success(data)
+        );
+      }
+
+      if (
+        url.pathname ===
+          "/api/notifications" &&
+        request.method ===
+          "GET"
+      ) {
+        const auth =
+          await requirePermission(
+            env,
+            request,
+            PERMISSIONS.notifications
+          );
+
+        if (auth.response) {
+          return withCors(
+            auth.response
+          );
+        }
+
+        const userId =
+          url.searchParams.get(
+            "user_id"
+          );
+
+        const botId =
+          url.searchParams.get(
+            "bot_id"
+          );
+
+        const data =
+          await getNotifications(
+            env,
+            userId,
+            botId
+          );
+
+        return withCors(
+          success(data)
+        );
+      }
+
+      if (
+        url.pathname ===
+          "/api/analytics" &&
+        request.method ===
+          "GET"
+      ) {
+        const auth =
+          await requirePermission(
+            env,
+            request,
+            PERMISSIONS.analytics
+          );
+
+        if (auth.response) {
+          return withCors(
+            auth.response
+          );
+        }
+
+        const userId =
+          url.searchParams.get(
+            "user_id"
+          );
+
+        const botId =
+          url.searchParams.get(
+            "bot_id"
+          );
+
+        const eventType =
+          url.searchParams.get(
+            "event_type"
+          );
+
+        const data =
+          await getAnalytics(
+            env,
+            userId,
+            botId,
+            eventType
+          );
+
+        return withCors(
+          success(data)
+        );
+      }
+
+      if (
+        url.pathname ===
+          "/api/settings" &&
+        request.method ===
+          "GET"
+      ) {
+        const auth =
+          await requirePermission(
+            env,
+            request,
+            PERMISSIONS.settings
+          );
+
+        if (auth.response) {
+          return withCors(
+            auth.response
+          );
+        }
+
+        const botId =
+          url.searchParams.get(
+            "bot_id"
+          );
+
+        const data =
+          await getSettings(
+            env,
+            botId
+          );
+
+        return withCors(
+          success(data)
+        );
+      }
+
+      return withCors(
+        failure(
+          "NOT_FOUND",
+          "Endpoint not found",
+          404
+        )
       );
-
     } catch (error) {
       console.error(error);
 
-      return failure(
-        "API_ERROR",
-        error.message || "Internal server error",
-        500
+      return withCors(
+        failure(
+          "API_ERROR",
+          error.message ||
+            "Internal server error",
+          500
+        )
       );
     }
   }
