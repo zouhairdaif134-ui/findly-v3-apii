@@ -133,13 +133,26 @@ function App() {
   }
 
   async function fetchApi(endpoint) {
+    if (!session?.access_token) {
+      throw new Error("Authentication session is missing");
+    }
+
     const response = await fetch(
-      `${API_URL}${endpoint}`
+      `${API_URL}${endpoint}`,
+      {
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+          "Content-Type": "application/json"
+        }
+      }
     );
 
     if (!response.ok) {
+      const result = await response.json().catch(() => null);
+
       throw new Error(
-        `API ${response.status}`
+        result?.error?.message ||
+          `API ${response.status}`
       );
     }
 
