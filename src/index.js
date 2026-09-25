@@ -1,4 +1,9 @@
-import { getBots } from "./routes/bots.js";
+import {
+  getBots,
+  createBot,
+  updateBot,
+  deleteBot
+} from "./routes/bots.js";
 import { getCategories } from "./routes/categories.js";
 import { getMenus } from "./routes/menus.js";
 import { getContent } from "./routes/content.js";
