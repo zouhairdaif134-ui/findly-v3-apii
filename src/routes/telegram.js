@@ -1,0 +1,876 @@
+import { getSupabase } from "../lib/supabase.js";
+import {
+  sendMessage,
+  answerCallback
+} from "../lib/telegram.js";
+
+async function getBot(
+  env,
+  botSlug
+) {
+  const supabase = getSupabase(env);
+
+  const { data, error } =
+    await supabase
+      .from("bots")
+      .select(
+        "id, name, slug, bot_type, telegram_username, description, icon, is_active, sort_order"
+      )
+      .eq("slug", botSlug)
+      .single();
+
+  if (error) {
+    throw error;
+  }
+
+  if (!data || !data.is_active) {
+    throw new Error(
+      "Telegram bot is inactive or not found"
+    );
+  }
+
+  return data;
+}
+
+async function getMasterBot(
+  env
+) {
+  const supabase = getSupabase(env);
+
+  const { data, error } =
+    await supabase
+      .from("bots")
+      .select(
+        "id, name, slug, bot_type, telegram_username, description, icon, is_active, sort_order"
+      )
+      .eq("bot_type", "master")
+      .eq("is_active", true)
+      .single();
+
+  if (error) {
+    throw error;
+  }
+
+  return data;
+}
+
+async function getChildBots(
+  env
+) {
+  const supabase = getSupabase(env);
+
+  const { data, error } =
+    await supabase
+      .from("bots")
+      .select(
+        "id, name, slug, bot_type, telegram_username, description, icon, is_active, sort_order"
+      )
+      .eq("bot_type", "child")
+      .eq("is_active", true)
+      .order("sort_order", {
+        ascending: true
+      });
+
+  if (error) {
+    throw error;
+  }
+
+  return data || [];
+}
+
+async function saveTelegramUser(
+  env,
+  bot,
+  telegramUser
+) {
+  if (!telegramUser?.id) {
+    return null;
+  }
+
+  const supabase = getSupabase(env);
+
+  const telegramUserId =
+    String(telegramUser.id);
+
+  const { data: existingUser } =
+    await supabase
+      .from("telegram_users")
+      .select(
+        "id, telegram_user_id"
+      )
+      .eq(
+        "telegram_user_id",
+        telegramUserId
+      )
+      .maybeSingle();
+
+  let user;
+
+  if (existingUser) {
+    const { data, error } =
+      await supabase
+        .from("telegram_users")
+        .update({
+          username:
+            telegramUser.username ||
+            null,
+          first_name:
+            telegramUser.first_name ||
+            null,
+          last_name:
+            telegramUser.last_name ||
+            null,
+          language_code:
+            telegramUser.language_code ||
+            null,
+          is_active: true,
+          last_seen_at:
+            new Date().toISOString()
+        })
+        .eq(
+          "id",
+          existingUser.id
+        )
+        .select(
+          "id, telegram_user_id"
+        )
+        .single();
+
+    if (error) {
+      throw error;
+    }
+
+    user = data;
+  } else {
+    const { data, error } =
+      await supabase
+        .from("telegram_users")
+        .insert({
+          telegram_user_id:
+            telegramUserId,
+          username:
+            telegramUser.username ||
+            null,
+          first_name:
+            telegramUser.first_name ||
+            null,
+          last_name:
+            telegramUser.last_name ||
+            null,
+          language_code:
+            telegramUser.language_code ||
+            null,
+          is_active: true,
+          first_seen_at:
+            new Date().toISOString(),
+          last_seen_at:
+            new Date().toISOString()
+        })
+        .select(
+          "id, telegram_user_id"
+        )
+        .single();
+
+    if (error) {
+      throw error;
+    }
+
+    user = data;
+  }
+
+  if (!user?.id || !bot?.id) {
+    return user;
+  }
+
+  const { data: existingRelation } =
+    await supabase
+      .from("user_bots")
+      .select(
+        "user_id, bot_id"
+      )
+      .eq(
+        "user_id",
+        user.id
+      )
+      .eq(
+        "bot_id",
+        bot.id
+      )
+      .maybeSingle();
+
+  if (!existingRelation) {
+    const { error } =
+      await supabase
+        .from("user_bots")
+        .insert({
+          user_id: user.id,
+          bot_id: bot.id
+        });
+
+    if (error) {
+      throw error;
+    }
+  }
+
+  return user;
+}
+
+function escapeHtml(
+  value
+) {
+  return String(value || "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;");
+}
+
+async function sendMasterMenu(
+  env,
+  chatId
+) {
+  const bots =
+    await getChildBots(env);
+
+  const keyboard = [];
+
+  for (const bot of bots) {
+    if (!bot.telegram_username) {
+      continue;
+    }
+
+    keyboard.push([
+      {
+        text: `${bot.icon || "🤖"} ${bot.name}`,
+        url:
+          `https://t.me/` +
+          bot.telegram_username.replace(
+            /^@/,
+            ""
+          )
+      }
+    ]);
+  }
+
+  await sendMessage(
+    env,
+    "findly",
+    chatId,
+    "<b>🤖 FINDLY</b>\n\n" +
+      "اختار الخدمة اللي بغيتي:",
+    {
+      reply_markup: {
+        inline_keyboard:
+          keyboard
+      }
+    }
+  );
+}
+
+async function sendHomeButton(
+  env,
+  botSlug
+) {
+  const master =
+    await getMasterBot(env);
+
+  if (
+    !master ||
+    !master.telegram_username
+  ) {
+    return null;
+  }
+
+  return {
+    text: "🏠 FINDLY",
+    url:
+      `https://t.me/` +
+      master.telegram_username.replace(
+        /^@/,
+        ""
+      )
+  };
+}
+
+async function sendChildMenu(
+  env,
+  bot,
+  chatId
+) {
+  const supabase = getSupabase(env);
+
+  const { data: menus, error } =
+    await supabase
+      .from("menu_items")
+      .select(
+        "id, bot_id, parent_id, label, icon, action_type, action_value, is_active, sort_order"
+      )
+      .eq(
+        "bot_id",
+        bot.id
+      )
+      .eq(
+        "is_active",
+        true
+      )
+      .is(
+        "parent_id",
+        null
+      )
+      .order("sort_order", {
+        ascending: true
+      })
+      .order("created_at", {
+        ascending: true
+      });
+
+  if (error) {
+    throw error;
+  }
+
+  const keyboard = [];
+
+  for (const item of menus || []) {
+    if (
+      item.action_type === "url" &&
+      item.action_value
+    ) {
+      keyboard.push([
+        {
+          text:
+            `${item.icon || "🔘"} ${item.label}`,
+          url: item.action_value
+        }
+      ]);
+      continue;
+    }
+
+    keyboard.push([
+      {
+        text:
+          `${item.icon || "🔘"} ${item.label}`,
+        callback_data:
+          `menu:${item.id}`
+      }
+    ]);
+  }
+
+  const homeButton =
+    await sendHomeButton(
+      env,
+      bot.slug
+    );
+
+  if (homeButton) {
+    keyboard.push([
+      homeButton
+    ]);
+  }
+
+  await sendMessage(
+    env,
+    bot.slug,
+    chatId,
+    `<b>${escapeHtml(
+      bot.icon || "🤖"
+    )} ${escapeHtml(bot.name)}</b>\n\n` +
+      escapeHtml(
+        bot.description ||
+          "اختار من القائمة:"
+      ),
+    {
+      reply_markup: {
+        inline_keyboard:
+          keyboard
+      }
+    }
+  );
+}
+
+async function sendCategory(
+  env,
+  bot,
+  chatId,
+  categorySlug
+) {
+  const supabase = getSupabase(env);
+
+  const { data: category, error } =
+    await supabase
+      .from("categories")
+      .select(
+        "id, name, slug, icon, description, is_active"
+      )
+      .eq(
+        "slug",
+        categorySlug
+      )
+      .eq(
+        "is_active",
+        true
+      )
+      .maybeSingle();
+
+  if (error) {
+    throw error;
+  }
+
+  if (!category) {
+    await sendMessage(
+      env,
+      bot.slug,
+      chatId,
+      "ما لقيتش هاد القسم."
+    );
+
+    return;
+  }
+
+  const { data: content, error: contentError } =
+    await supabase
+      .from("content_items")
+      .select(
+        "id, content_type, title, description, image_url, external_url, metadata, published_at"
+      )
+      .eq(
+        "bot_id",
+        bot.id
+      )
+      .eq(
+        "category_id",
+        category.id
+      )
+      .eq(
+        "is_active",
+        true
+      )
+      .order(
+        "published_at",
+        {
+          ascending: false,
+          nullsFirst: false
+        }
+      )
+      .order(
+        "created_at",
+        {
+          ascending: false
+        })
+      .limit(10);
+
+  if (contentError) {
+    throw contentError;
+  }
+
+  const lines = [
+    `<b>${escapeHtml(
+      category.icon || "📁"
+    )} ${escapeHtml(
+      category.name
+    )}</b>`
+  ];
+
+  if (category.description) {
+    lines.push(
+      "",
+      escapeHtml(
+        category.description
+      )
+    );
+  }
+
+  if (
+    !content ||
+    content.length === 0
+  ) {
+    lines.push(
+      "",
+      "حالياً ما كاين حتى محتوى فهاد القسم."
+    );
+  } else {
+    lines.push("");
+
+    content.forEach(
+      (item, index) => {
+        lines.push(
+          `<b>${index + 1}. ${escapeHtml(
+            item.title
+          )}</b>`
+        );
+
+        if (item.description) {
+          lines.push(
+            escapeHtml(
+              item.description
+            )
+          );
+        }
+
+        if (item.external_url) {
+          lines.push(
+            `<a href="${escapeHtml(
+              item.external_url
+            )}">🔗 فتح الرابط</a>`
+          );
+        }
+
+        lines.push("");
+      }
+    );
+  }
+
+  const homeButton =
+    await sendHomeButton(
+      env,
+      bot.slug
+    );
+
+  const keyboard = [];
+
+  if (homeButton) {
+    keyboard.push([
+      homeButton
+    ]);
+  }
+
+  await sendMessage(
+    env,
+    bot.slug,
+    chatId,
+    lines.join("\n"),
+    {
+      reply_markup: {
+        inline_keyboard:
+          keyboard
+      }
+    }
+  );
+}
+
+async function handleMenuCallback(
+  env,
+  bot,
+  chatId,
+  callbackQuery
+) {
+  const menuId =
+    callbackQuery.data?.startsWith(
+      "menu:"
+    )
+      ? callbackQuery.data.slice(5)
+      : null;
+
+  if (!menuId) {
+    return;
+  }
+
+  const supabase = getSupabase(env);
+
+  const { data: item, error } =
+    await supabase
+      .from("menu_items")
+      .select(
+        "id, bot_id, label, icon, action_type, action_value, is_active"
+      )
+      .eq(
+        "id",
+        menuId
+      )
+      .eq(
+        "bot_id",
+        bot.id
+      )
+      .eq(
+        "is_active",
+        true
+      )
+      .maybeSingle();
+
+  if (error) {
+    throw error;
+  }
+
+  if (!item) {
+    await answerCallback(
+      env,
+      bot.slug,
+      callbackQuery.id,
+      "هاد الاختيار ما بقاش متاح."
+    );
+
+    return;
+  }
+
+  await answerCallback(
+    env,
+    bot.slug,
+    callbackQuery.id
+  );
+
+  if (
+    item.action_type ===
+      "category" &&
+    item.action_value
+  ) {
+    await sendCategory(
+      env,
+      bot,
+      chatId,
+      item.action_value
+    );
+
+    return;
+  }
+
+  if (
+    item.action_type ===
+      "content" &&
+    item.action_value
+  ) {
+    const { data: content } =
+      await supabase
+        .from("content_items")
+        .select(
+          "title, description, external_url"
+        )
+        .eq(
+          "id",
+          item.action_value
+        )
+        .eq(
+          "bot_id",
+          bot.id
+        )
+        .maybeSingle();
+
+    if (!content) {
+      await sendMessage(
+        env,
+        bot.slug,
+        chatId,
+        "المحتوى ما بقاش متاح."
+      );
+
+      return;
+    }
+
+    let text =
+      `<b>${escapeHtml(
+        content.title
+      )}</b>`;
+
+    if (content.description) {
+      text +=
+        `\n\n${escapeHtml(
+          content.description
+        )}`;
+    }
+
+    const keyboard = [];
+
+    if (
+      content.external_url
+    ) {
+      keyboard.push([
+        {
+          text: "🔗 فتح الرابط",
+          url: content.external_url
+        }
+      ]);
+    }
+
+    const homeButton =
+      await sendHomeButton(
+        env,
+        bot.slug
+      );
+
+    if (homeButton) {
+      keyboard.push([
+        homeButton
+      ]);
+    }
+
+    await sendMessage(
+      env,
+      bot.slug,
+      chatId,
+      text,
+      {
+        reply_markup: {
+          inline_keyboard:
+            keyboard
+        }
+      }
+    );
+
+    return;
+  }
+
+  if (
+    item.action_type ===
+      "url" &&
+    item.action_value
+  ) {
+    await sendMessage(
+      env,
+      bot.slug,
+      chatId,
+      `<b>${escapeHtml(
+        item.label
+      )}</b>\n\n${escapeHtml(
+        item.action_value
+      )}`
+    );
+
+    return;
+  }
+
+  if (
+    item.action_type ===
+      "menu"
+  ) {
+    await sendChildMenu(
+      env,
+      bot,
+      chatId
+    );
+
+    return;
+  }
+
+  await sendMessage(
+    env,
+    bot.slug,
+    chatId,
+    "هاد الاختيار مازال ما تبرمجش."
+  );
+}
+
+export async function handleTelegramUpdate(
+  env,
+  botSlug,
+  update
+) {
+  const bot =
+    await getBot(
+      env,
+      botSlug
+    );
+
+  const message =
+    update.message;
+
+  const callbackQuery =
+    update.callback_query;
+
+  const telegramUser =
+    message?.from ||
+    callbackQuery?.from;
+
+  await saveTelegramUser(
+    env,
+    bot,
+    telegramUser
+  );
+
+  if (callbackQuery) {
+    const chatId =
+      callbackQuery.message?.chat?.id;
+
+    if (!chatId) {
+      return {
+        ok: true
+      };
+    }
+
+    await handleMenuCallback(
+      env,
+      bot,
+      chatId,
+      callbackQuery
+    );
+
+    return {
+      ok: true
+    };
+  }
+
+  if (!message) {
+    return {
+      ok: true
+    };
+  }
+
+  const chatId =
+    message.chat?.id;
+
+  if (!chatId) {
+    return {
+      ok: true
+    };
+  }
+
+  const text =
+    message.text || "";
+
+  if (
+    text === "/start" ||
+    text.startsWith("/start ")
+  ) {
+    if (
+      bot.bot_type ===
+      "master"
+    ) {
+      await sendMasterMenu(
+        env,
+        chatId
+      );
+    } else {
+      await sendChildMenu(
+        env,
+        bot,
+        chatId
+      );
+    }
+
+    return {
+      ok: true
+    };
+  }
+
+  if (
+    text === "/help"
+  ) {
+    await sendMessage(
+      env,
+      bot.slug,
+      chatId,
+      "<b>ℹ️ المساعدة</b>\n\n" +
+        "استعمل /start باش ترجع للقائمة الرئيسية."
+    );
+
+    return {
+      ok: true
+    };
+  }
+
+  if (
+    bot.bot_type ===
+    "master"
+  ) {
+    await sendMasterMenu(
+      env,
+      chatId
+    );
+  } else {
+    await sendChildMenu(
+      env,
+      bot,
+      chatId
+    );
+  }
+
+  return {
+    ok: true
+  };
+        }
