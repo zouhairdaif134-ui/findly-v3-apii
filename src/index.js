@@ -4,6 +4,7 @@ import {
   updateBot,
   deleteBot
 } from "./routes/bots.js";
+
 import { getCategories } from "./routes/categories.js";
 import { getMenus } from "./routes/menus.js";
 import { getContent } from "./routes/content.js";
@@ -112,6 +113,121 @@ export default {
         );
       }
 
+      /*
+       * =========================
+       * BOTS
+       * =========================
+       */
+
+      if (
+        url.pathname ===
+          "/api/bots" &&
+        request.method ===
+          "POST"
+      ) {
+        const auth =
+          await requirePermission(
+            env,
+            request,
+            "bots.create"
+          );
+
+        if (auth.response) {
+          return withCors(
+            auth.response
+          );
+        }
+
+        const body =
+          await request.json();
+
+        const data =
+          await createBot(
+            env,
+            body
+          );
+
+        return withCors(
+          success(data)
+        );
+      }
+
+      if (
+        url.pathname.startsWith(
+          "/api/bots/"
+        ) &&
+        request.method ===
+          "PUT"
+      ) {
+        const auth =
+          await requirePermission(
+            env,
+            request,
+            "bots.update"
+          );
+
+        if (auth.response) {
+          return withCors(
+            auth.response
+          );
+        }
+
+        const id =
+          url.pathname
+            .split("/")
+            .pop();
+
+        const body =
+          await request.json();
+
+        const data =
+          await updateBot(
+            env,
+            id,
+            body
+          );
+
+        return withCors(
+          success(data)
+        );
+      }
+
+      if (
+        url.pathname.startsWith(
+          "/api/bots/"
+        ) &&
+        request.method ===
+          "DELETE"
+      ) {
+        const auth =
+          await requirePermission(
+            env,
+            request,
+            "bots.delete"
+          );
+
+        if (auth.response) {
+          return withCors(
+            auth.response
+          );
+        }
+
+        const id =
+          url.pathname
+            .split("/")
+            .pop();
+
+        const data =
+          await deleteBot(
+            env,
+            id
+          );
+
+        return withCors(
+          success(data)
+        );
+      }
+
       if (
         url.pathname ===
           "/api/bots" &&
@@ -138,6 +254,12 @@ export default {
           success(data)
         );
       }
+
+      /*
+       * =========================
+       * CATEGORIES
+       * =========================
+       */
 
       if (
         url.pathname ===
@@ -167,6 +289,12 @@ export default {
           success(data)
         );
       }
+
+      /*
+       * =========================
+       * MENUS
+       * =========================
+       */
 
       if (
         url.pathname ===
@@ -202,6 +330,12 @@ export default {
           success(data)
         );
       }
+
+      /*
+       * =========================
+       * CONTENT
+       * =========================
+       */
 
       if (
         url.pathname ===
@@ -244,6 +378,12 @@ export default {
         );
       }
 
+      /*
+       * =========================
+       * USERS
+       * =========================
+       */
+
       if (
         url.pathname ===
           "/api/users" &&
@@ -279,6 +419,12 @@ export default {
         );
       }
 
+      /*
+       * =========================
+       * FAVORITES
+       * =========================
+       */
+
       if (
         url.pathname ===
           "/api/favorites" &&
@@ -313,6 +459,12 @@ export default {
           success(data)
         );
       }
+
+      /*
+       * =========================
+       * NOTIFICATIONS
+       * =========================
+       */
 
       if (
         url.pathname ===
@@ -354,6 +506,12 @@ export default {
           success(data)
         );
       }
+
+      /*
+       * =========================
+       * ANALYTICS
+       * =========================
+       */
 
       if (
         url.pathname ===
@@ -401,6 +559,12 @@ export default {
           success(data)
         );
       }
+
+      /*
+       * =========================
+       * SETTINGS
+       * =========================
+       */
 
       if (
         url.pathname ===
