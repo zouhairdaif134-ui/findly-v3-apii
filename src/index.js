@@ -36,7 +36,17 @@ import { getNotifications } from "./routes/notifications.js";
 import { getAnalytics } from "./routes/analytics.js";
 import { getSettings } from "./routes/settings.js";
 
+import {
+  handleTelegramUpdate
+} from "./routes/telegram.js";
+
+import {
+  setWebhook,
+  deleteWebhook
+} from "./lib/telegram.js";
+
 import { authorizeRequest } from "./lib/auth.js";
+
 import {
   success,
   failure
@@ -44,22 +54,46 @@ import {
 
 const PERMISSIONS = {
   botsView: "bots.view",
-  categoriesView: "categories.view",
-  categoriesCreate: "categories.create",
-  categoriesUpdate: "categories.update",
-  categoriesDelete: "categories.delete",
-  menusView: "menus.view",
-  menusManage: "menus.manage",
-  contentView: "content.view",
-  contentCreate: "content.create",
-  contentUpdate: "content.update",
-  contentDelete: "content.delete",
-  usersView: "users.view",
-  usersManage: "users.manage",
-  favorites: "users.view",
-  notifications: "notifications.manage",
-  analytics: "analytics.view",
-  settings: "settings.manage"
+
+  categoriesView:
+    "categories.view",
+  categoriesCreate:
+    "categories.create",
+  categoriesUpdate:
+    "categories.update",
+  categoriesDelete:
+    "categories.delete",
+
+  menusView:
+    "menus.view",
+  menusManage:
+    "menus.manage",
+
+  contentView:
+    "content.view",
+  contentCreate:
+    "content.create",
+  contentUpdate:
+    "content.update",
+  contentDelete:
+    "content.delete",
+
+  usersView:
+    "users.view",
+  usersManage:
+    "users.manage",
+
+  favorites:
+    "users.view",
+
+  notifications:
+    "notifications.manage",
+
+  analytics:
+    "analytics.view",
+
+  settings:
+    "settings.manage"
 };
 
 function corsHeaders() {
@@ -76,16 +110,22 @@ function withCors(response) {
   const headers =
     new Headers(response.headers);
 
-  Object.entries(corsHeaders()).forEach(
+  Object.entries(
+    corsHeaders()
+  ).forEach(
     ([key, value]) => {
-      headers.set(key, value);
+      headers.set(
+        key,
+        value
+      );
     }
   );
 
   return new Response(
     response.body,
     {
-      status: response.status,
+      status:
+        response.status,
       statusText:
         response.statusText,
       headers
@@ -105,7 +145,9 @@ async function requirePermission(
   );
 }
 
-async function readJson(request) {
+async function readJson(
+  request
+) {
   try {
     return await request.json();
   } catch {
@@ -124,10 +166,26 @@ function getId(url) {
   return parts[2] || null;
 }
 
+function getTelegramSlug(
+  url
+) {
+  const parts =
+    url.pathname
+      .split("/")
+      .filter(Boolean);
+
+  return parts[1] || null;
+}
+
 export default {
-  async fetch(request, env) {
+  async fetch(
+    request,
+    env
+  ) {
     const url =
-      new URL(request.url);
+      new URL(
+        request.url
+      );
 
     try {
       if (
@@ -135,11 +193,20 @@ export default {
         "OPTIONS"
       ) {
         return withCors(
-          new Response(null, {
-            status: 204
-          })
+          new Response(
+            null,
+            {
+              status: 204
+            }
+          )
         );
       }
+
+      /*
+       * =========================
+       * HEALTH
+       * =========================
+       */
 
       if (
         url.pathname ===
@@ -152,9 +219,219 @@ export default {
             service:
               "findly-v3-api",
             version:
-              "3.0.0",
+              "3.1.0",
             status:
               "healthy"
+          })
+        );
+      }
+
+      /*
+       * =========================
+       * TELEGRAM WEBHOOKS
+       * =========================
+       */
+
+      if (
+        url.pathname.startsWith(
+          "/telegram/"
+        ) &&
+        request.method ===
+          "POST"
+      ) {
+        if (
+          !env.TELEGRAM_WEBHOOK_SECRET
+        ) {
+          return withCors(
+            failure(
+              "TELEGRAM_CONFIG_ERROR",
+              "Telegram webhook secret is missing",
+              500
+            )
+          );
+        }
+
+        const receivedSecret =
+          request.headers.get(
+            "X-Telegram-Bot-Api-Secret-Token"
+          );
+
+        if (
+          receivedSecret !==
+          env.TELEGRAM_WEBHOOK_SECRET
+        ) {
+          return withCors(
+            failure(
+              "UNAUTHORIZED",
+              "Invalid Telegram webhook secret",
+              401
+            )
+          );
+        }
+
+        const botSlug =
+          getTelegramSlug(
+            url
+          );
+
+        if (!botSlug) {
+          return withCors(
+            failure(
+              "BAD_REQUEST",
+              "Telegram bot slug is required",
+              400
+            )
+          );
+        }
+
+        const update =
+          await readJson(
+            request
+          );
+
+        await handleTelegramUpdate(
+          env,
+          botSlug,
+          update
+        );
+
+        return withCors(
+          success({
+            ok: true
+          })
+        );
+      }
+
+      /*
+       * =========================
+       * TELEGRAM WEBHOOK SETUP
+       * =========================
+       *
+       * Protected admin endpoint.
+       *
+       * POST
+       * /api/telegram/webhook/:slug
+       */
+
+      if (
+        url.pathname.startsWith(
+          "/api/telegram/webhook/"
+        ) &&
+        request.method ===
+          "POST"
+      ) {
+        const auth =
+          await requirePermission(
+            env,
+            request,
+            "settings.manage"
+          );
+
+        if (auth.response) {
+          return withCors(
+            auth.response
+          );
+        }
+
+        if (
+          !env.TELEGRAM_WEBHOOK_SECRET
+        ) {
+          throw new Error(
+            "TELEGRAM_WEBHOOK_SECRET is missing"
+          );
+        }
+
+        const parts =
+          url.pathname
+            .split("/")
+            .filter(Boolean);
+
+        const botSlug =
+          parts[3] || null;
+
+        if (!botSlug) {
+          throw new Error(
+            "Bot slug is required"
+          );
+        }
+
+        const webhookUrl =
+          `${url.origin}/telegram/${botSlug}`;
+
+        const result =
+          await setWebhook(
+            env,
+            botSlug,
+            webhookUrl
+          );
+
+        return withCors(
+          success({
+            bot:
+              botSlug,
+            webhook:
+              webhookUrl,
+            result
+          })
+        );
+      }
+
+      /*
+       * =========================
+       * TELEGRAM WEBHOOK DELETE
+       * =========================
+       *
+       * Protected admin endpoint.
+       *
+       * DELETE
+       * /api/telegram/webhook/:slug
+       */
+
+      if (
+        url.pathname.startsWith(
+          "/api/telegram/webhook/"
+        ) &&
+        request.method ===
+          "DELETE"
+      ) {
+        const auth =
+          await requirePermission(
+            env,
+            request,
+            "settings.manage"
+          );
+
+        if (auth.response) {
+          return withCors(
+            auth.response
+          );
+        }
+
+        const parts =
+          url.pathname
+            .split("/")
+            .filter(Boolean);
+
+        const botSlug =
+          parts[3] || null;
+
+        if (!botSlug) {
+          throw new Error(
+            "Bot slug is required"
+          );
+        }
+
+        const result =
+          await deleteWebhook(
+            env,
+            botSlug
+          );
+
+        return withCors(
+          success({
+            bot:
+              botSlug,
+            result
           })
         );
       }
@@ -187,7 +464,9 @@ export default {
         const data =
           await createBot(
             env,
-            await readJson(request)
+            await readJson(
+              request
+            )
           );
 
         return withCors(
@@ -219,7 +498,9 @@ export default {
           await updateBot(
             env,
             getId(url),
-            await readJson(request)
+            await readJson(
+              request
+            )
           );
 
         return withCors(
@@ -279,7 +560,9 @@ export default {
 
         return withCors(
           success(
-            await getBots(env)
+            await getBots(
+              env
+            )
           )
         );
       }
@@ -311,7 +594,9 @@ export default {
 
         return withCors(
           success(
-            await getCategories(env)
+            await getCategories(
+              env
+            )
           )
         );
       }
@@ -339,7 +624,9 @@ export default {
           success(
             await createCategory(
               env,
-              await readJson(request)
+              await readJson(
+                request
+              )
             )
           )
         );
@@ -370,7 +657,9 @@ export default {
             await updateCategory(
               env,
               getId(url),
-              await readJson(request)
+              await readJson(
+                request
+              )
             )
           )
         );
@@ -466,7 +755,9 @@ export default {
           success(
             await createMenu(
               env,
-              await readJson(request)
+              await readJson(
+                request
+              )
             )
           )
         );
@@ -497,7 +788,9 @@ export default {
             await updateMenu(
               env,
               getId(url),
-              await readJson(request)
+              await readJson(
+                request
+              )
             )
           )
         );
@@ -596,7 +889,9 @@ export default {
           success(
             await createContent(
               env,
-              await readJson(request)
+              await readJson(
+                request
+              )
             )
           )
         );
@@ -627,7 +922,9 @@ export default {
             await updateContent(
               env,
               getId(url),
-              await readJson(request)
+              await readJson(
+                request
+              )
             )
           )
         );
@@ -725,7 +1022,9 @@ export default {
             await updateUser(
               env,
               getId(url),
-              await readJson(request)
+              await readJson(
+                request
+              )
             )
           )
         );
@@ -878,7 +1177,9 @@ export default {
         )
       );
     } catch (error) {
-      console.error(error);
+      console.error(
+        error
+      );
 
       return withCors(
         failure(
