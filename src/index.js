@@ -5,23 +5,57 @@ import {
   deleteBot
 } from "./routes/bots.js";
 
-import { getCategories } from "./routes/categories.js";
-import { getMenus } from "./routes/menus.js";
-import { getContent } from "./routes/content.js";
-import { getUsers } from "./routes/users.js";
+import {
+  getCategories,
+  createCategory,
+  updateCategory,
+  deleteCategory
+} from "./routes/categories.js";
+
+import {
+  getMenus,
+  createMenu,
+  updateMenu,
+  deleteMenu
+} from "./routes/menus.js";
+
+import {
+  getContent,
+  createContent,
+  updateContent,
+  deleteContent
+} from "./routes/content.js";
+
+import {
+  getUsers,
+  updateUser
+} from "./routes/users.js";
+
 import { getFavorites } from "./routes/favorites.js";
 import { getNotifications } from "./routes/notifications.js";
 import { getAnalytics } from "./routes/analytics.js";
 import { getSettings } from "./routes/settings.js";
+
 import { authorizeRequest } from "./lib/auth.js";
-import { success, failure } from "./lib/response.js";
+import {
+  success,
+  failure
+} from "./lib/response.js";
 
 const PERMISSIONS = {
-  bots: "bots.view",
-  categories: "categories.view",
-  menus: "menus.view",
-  content: "content.view",
-  users: "users.view",
+  botsView: "bots.view",
+  categoriesView: "categories.view",
+  categoriesCreate: "categories.create",
+  categoriesUpdate: "categories.update",
+  categoriesDelete: "categories.delete",
+  menusView: "menus.view",
+  menusManage: "menus.manage",
+  contentView: "content.view",
+  contentCreate: "content.create",
+  contentUpdate: "content.update",
+  contentDelete: "content.delete",
+  usersView: "users.view",
+  usersManage: "users.manage",
   favorites: "users.view",
   notifications: "notifications.manage",
   analytics: "analytics.view",
@@ -42,10 +76,7 @@ function withCors(response) {
   const headers =
     new Headers(response.headers);
 
-  const cors =
-    corsHeaders();
-
-  Object.entries(cors).forEach(
+  Object.entries(corsHeaders()).forEach(
     ([key, value]) => {
       headers.set(key, value);
     }
@@ -54,8 +85,7 @@ function withCors(response) {
   return new Response(
     response.body,
     {
-      status:
-        response.status,
+      status: response.status,
       statusText:
         response.statusText,
       headers
@@ -75,11 +105,27 @@ async function requirePermission(
   );
 }
 
+async function readJson(request) {
+  try {
+    return await request.json();
+  } catch {
+    throw new Error(
+      "Request body must contain valid JSON"
+    );
+  }
+}
+
+function getId(url) {
+  const parts =
+    url.pathname
+      .split("/")
+      .filter(Boolean);
+
+  return parts[2] || null;
+}
+
 export default {
-  async fetch(
-    request,
-    env
-  ) {
+  async fetch(request, env) {
     const url =
       new URL(request.url);
 
@@ -138,13 +184,10 @@ export default {
           );
         }
 
-        const body =
-          await request.json();
-
         const data =
           await createBot(
             env,
-            body
+            await readJson(request)
           );
 
         return withCors(
@@ -172,19 +215,11 @@ export default {
           );
         }
 
-        const id =
-          url.pathname
-            .split("/")
-            .pop();
-
-        const body =
-          await request.json();
-
         const data =
           await updateBot(
             env,
-            id,
-            body
+            getId(url),
+            await readJson(request)
           );
 
         return withCors(
@@ -212,15 +247,10 @@ export default {
           );
         }
 
-        const id =
-          url.pathname
-            .split("/")
-            .pop();
-
         const data =
           await deleteBot(
             env,
-            id
+            getId(url)
           );
 
         return withCors(
@@ -238,7 +268,7 @@ export default {
           await requirePermission(
             env,
             request,
-            PERMISSIONS.bots
+            PERMISSIONS.botsView
           );
 
         if (auth.response) {
@@ -247,11 +277,10 @@ export default {
           );
         }
 
-        const data =
-          await getBots(env);
-
         return withCors(
-          success(data)
+          success(
+            await getBots(env)
+          )
         );
       }
 
@@ -271,7 +300,7 @@ export default {
           await requirePermission(
             env,
             request,
-            PERMISSIONS.categories
+            PERMISSIONS.categoriesView
           );
 
         if (auth.response) {
@@ -280,13 +309,100 @@ export default {
           );
         }
 
-        const data =
-          await getCategories(
-            env
+        return withCors(
+          success(
+            await getCategories(env)
+          )
+        );
+      }
+
+      if (
+        url.pathname ===
+          "/api/categories" &&
+        request.method ===
+          "POST"
+      ) {
+        const auth =
+          await requirePermission(
+            env,
+            request,
+            PERMISSIONS.categoriesCreate
           );
 
+        if (auth.response) {
+          return withCors(
+            auth.response
+          );
+        }
+
         return withCors(
-          success(data)
+          success(
+            await createCategory(
+              env,
+              await readJson(request)
+            )
+          )
+        );
+      }
+
+      if (
+        url.pathname.startsWith(
+          "/api/categories/"
+        ) &&
+        request.method ===
+          "PUT"
+      ) {
+        const auth =
+          await requirePermission(
+            env,
+            request,
+            PERMISSIONS.categoriesUpdate
+          );
+
+        if (auth.response) {
+          return withCors(
+            auth.response
+          );
+        }
+
+        return withCors(
+          success(
+            await updateCategory(
+              env,
+              getId(url),
+              await readJson(request)
+            )
+          )
+        );
+      }
+
+      if (
+        url.pathname.startsWith(
+          "/api/categories/"
+        ) &&
+        request.method ===
+          "DELETE"
+      ) {
+        const auth =
+          await requirePermission(
+            env,
+            request,
+            PERMISSIONS.categoriesDelete
+          );
+
+        if (auth.response) {
+          return withCors(
+            auth.response
+          );
+        }
+
+        return withCors(
+          success(
+            await deleteCategory(
+              env,
+              getId(url)
+            )
+          )
         );
       }
 
@@ -306,7 +422,7 @@ export default {
           await requirePermission(
             env,
             request,
-            PERMISSIONS.menus
+            PERMISSIONS.menusView
           );
 
         if (auth.response) {
@@ -315,19 +431,105 @@ export default {
           );
         }
 
-        const botSlug =
-          url.searchParams.get(
-            "bot"
+        return withCors(
+          success(
+            await getMenus(
+              env,
+              url.searchParams.get(
+                "bot"
+              )
+            )
+          )
+        );
+      }
+
+      if (
+        url.pathname ===
+          "/api/menus" &&
+        request.method ===
+          "POST"
+      ) {
+        const auth =
+          await requirePermission(
+            env,
+            request,
+            PERMISSIONS.menusManage
           );
 
-        const data =
-          await getMenus(
-            env,
-            botSlug
+        if (auth.response) {
+          return withCors(
+            auth.response
           );
+        }
 
         return withCors(
-          success(data)
+          success(
+            await createMenu(
+              env,
+              await readJson(request)
+            )
+          )
+        );
+      }
+
+      if (
+        url.pathname.startsWith(
+          "/api/menus/"
+        ) &&
+        request.method ===
+          "PUT"
+      ) {
+        const auth =
+          await requirePermission(
+            env,
+            request,
+            PERMISSIONS.menusManage
+          );
+
+        if (auth.response) {
+          return withCors(
+            auth.response
+          );
+        }
+
+        return withCors(
+          success(
+            await updateMenu(
+              env,
+              getId(url),
+              await readJson(request)
+            )
+          )
+        );
+      }
+
+      if (
+        url.pathname.startsWith(
+          "/api/menus/"
+        ) &&
+        request.method ===
+          "DELETE"
+      ) {
+        const auth =
+          await requirePermission(
+            env,
+            request,
+            PERMISSIONS.menusManage
+          );
+
+        if (auth.response) {
+          return withCors(
+            auth.response
+          );
+        }
+
+        return withCors(
+          success(
+            await deleteMenu(
+              env,
+              getId(url)
+            )
+          )
         );
       }
 
@@ -347,7 +549,7 @@ export default {
           await requirePermission(
             env,
             request,
-            PERMISSIONS.content
+            PERMISSIONS.contentView
           );
 
         if (auth.response) {
@@ -356,25 +558,108 @@ export default {
           );
         }
 
-        const botSlug =
-          url.searchParams.get(
-            "bot"
-          );
+        return withCors(
+          success(
+            await getContent(
+              env,
+              url.searchParams.get(
+                "bot"
+              ),
+              url.searchParams.get(
+                "category"
+              )
+            )
+          )
+        );
+      }
 
-        const categorySlug =
-          url.searchParams.get(
-            "category"
-          );
-
-        const data =
-          await getContent(
+      if (
+        url.pathname ===
+          "/api/content" &&
+        request.method ===
+          "POST"
+      ) {
+        const auth =
+          await requirePermission(
             env,
-            botSlug,
-            categorySlug
+            request,
+            PERMISSIONS.contentCreate
           );
+
+        if (auth.response) {
+          return withCors(
+            auth.response
+          );
+        }
 
         return withCors(
-          success(data)
+          success(
+            await createContent(
+              env,
+              await readJson(request)
+            )
+          )
+        );
+      }
+
+      if (
+        url.pathname.startsWith(
+          "/api/content/"
+        ) &&
+        request.method ===
+          "PUT"
+      ) {
+        const auth =
+          await requirePermission(
+            env,
+            request,
+            PERMISSIONS.contentUpdate
+          );
+
+        if (auth.response) {
+          return withCors(
+            auth.response
+          );
+        }
+
+        return withCors(
+          success(
+            await updateContent(
+              env,
+              getId(url),
+              await readJson(request)
+            )
+          )
+        );
+      }
+
+      if (
+        url.pathname.startsWith(
+          "/api/content/"
+        ) &&
+        request.method ===
+          "DELETE"
+      ) {
+        const auth =
+          await requirePermission(
+            env,
+            request,
+            PERMISSIONS.contentDelete
+          );
+
+        if (auth.response) {
+          return withCors(
+            auth.response
+          );
+        }
+
+        return withCors(
+          success(
+            await deleteContent(
+              env,
+              getId(url)
+            )
+          )
         );
       }
 
@@ -394,7 +679,7 @@ export default {
           await requirePermission(
             env,
             request,
-            PERMISSIONS.users
+            PERMISSIONS.usersView
           );
 
         if (auth.response) {
@@ -403,25 +688,52 @@ export default {
           );
         }
 
-        const botId =
-          url.searchParams.get(
-            "bot_id"
+        return withCors(
+          success(
+            await getUsers(
+              env,
+              url.searchParams.get(
+                "bot_id"
+              )
+            )
+          )
+        );
+      }
+
+      if (
+        url.pathname.startsWith(
+          "/api/users/"
+        ) &&
+        request.method ===
+          "PUT"
+      ) {
+        const auth =
+          await requirePermission(
+            env,
+            request,
+            PERMISSIONS.usersManage
           );
 
-        const data =
-          await getUsers(
-            env,
-            botId
+        if (auth.response) {
+          return withCors(
+            auth.response
           );
+        }
 
         return withCors(
-          success(data)
+          success(
+            await updateUser(
+              env,
+              getId(url),
+              await readJson(request)
+            )
+          )
         );
       }
 
       /*
        * =========================
-       * FAVORITES
+       * EXISTING MODULES
        * =========================
        */
 
@@ -444,27 +756,17 @@ export default {
           );
         }
 
-        const userId =
-          url.searchParams.get(
-            "user_id"
-          );
-
-        const data =
-          await getFavorites(
-            env,
-            userId
-          );
-
         return withCors(
-          success(data)
+          success(
+            await getFavorites(
+              env,
+              url.searchParams.get(
+                "user_id"
+              )
+            )
+          )
         );
       }
-
-      /*
-       * =========================
-       * NOTIFICATIONS
-       * =========================
-       */
 
       if (
         url.pathname ===
@@ -485,33 +787,20 @@ export default {
           );
         }
 
-        const userId =
-          url.searchParams.get(
-            "user_id"
-          );
-
-        const botId =
-          url.searchParams.get(
-            "bot_id"
-          );
-
-        const data =
-          await getNotifications(
-            env,
-            userId,
-            botId
-          );
-
         return withCors(
-          success(data)
+          success(
+            await getNotifications(
+              env,
+              url.searchParams.get(
+                "user_id"
+              ),
+              url.searchParams.get(
+                "bot_id"
+              )
+            )
+          )
         );
       }
-
-      /*
-       * =========================
-       * ANALYTICS
-       * =========================
-       */
 
       if (
         url.pathname ===
@@ -532,39 +821,23 @@ export default {
           );
         }
 
-        const userId =
-          url.searchParams.get(
-            "user_id"
-          );
-
-        const botId =
-          url.searchParams.get(
-            "bot_id"
-          );
-
-        const eventType =
-          url.searchParams.get(
-            "event_type"
-          );
-
-        const data =
-          await getAnalytics(
-            env,
-            userId,
-            botId,
-            eventType
-          );
-
         return withCors(
-          success(data)
+          success(
+            await getAnalytics(
+              env,
+              url.searchParams.get(
+                "user_id"
+              ),
+              url.searchParams.get(
+                "bot_id"
+              ),
+              url.searchParams.get(
+                "event_type"
+              )
+            )
+          )
         );
       }
-
-      /*
-       * =========================
-       * SETTINGS
-       * =========================
-       */
 
       if (
         url.pathname ===
@@ -585,19 +858,15 @@ export default {
           );
         }
 
-        const botId =
-          url.searchParams.get(
-            "bot_id"
-          );
-
-        const data =
-          await getSettings(
-            env,
-            botId
-          );
-
         return withCors(
-          success(data)
+          success(
+            await getSettings(
+              env,
+              url.searchParams.get(
+                "bot_id"
+              )
+            )
+          )
         );
       }
 
