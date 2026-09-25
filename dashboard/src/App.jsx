@@ -23,11 +23,23 @@ const menu = [
 function App() {
   const [session, setSession] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
+  const [recoveryMode, setRecoveryMode] = useState(false);
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loginLoading, setLoginLoading] = useState(false);
   const [loginError, setLoginError] = useState("");
+
+  const [resetMode, setResetMode] = useState(false);
+  const [resetLoading, setResetLoading] = useState(false);
+  const [resetMessage, setResetMessage] = useState("");
+
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [updatePasswordLoading, setUpdatePasswordLoading] =
+    useState(false);
+  const [updatePasswordError, setUpdatePasswordError] =
+    useState("");
 
   const [bots, setBots] = useState([]);
   const [categories, setCategories] = useState([]);
@@ -68,11 +80,20 @@ function App() {
     const {
       data: { subscription }
     } = supabase.auth.onAuthStateChange(
-      (_event, session) => {
-        if (mounted) {
-          setSession(session);
-          setAuthLoading(false);
+      (event, session) => {
+        if (!mounted) {
+          return;
         }
+
+        if (event === "PASSWORD_RECOVERY") {
+          setRecoveryMode(true);
+          setResetMode(false);
+          setLoginError("");
+          setUpdatePasswordError("");
+        }
+
+        setSession(session);
+        setAuthLoading(false);
       }
     );
 
@@ -102,6 +123,8 @@ function App() {
       }
 
       setPassword("");
+      setResetMode(false);
+      setResetMessage("");
     } catch (error) {
       console.error(error);
 
@@ -110,6 +133,102 @@ function App() {
       );
     } finally {
       setLoginLoading(false);
+    }
+  }
+
+  async function handlePasswordReset(event) {
+    event.preventDefault();
+
+    try {
+      setResetLoading(true);
+      setLoginError("");
+      setResetMessage("");
+
+      const cleanEmail = email.trim();
+
+      if (!cleanEmail) {
+        throw new Error(
+          "Please enter your email address."
+        );
+      }
+
+      const { error } =
+        await supabase.auth.resetPasswordForEmail(
+          cleanEmail,
+          {
+            redirectTo: window.location.origin
+          }
+        );
+
+      if (error) {
+        throw error;
+      }
+
+      setResetMessage(
+        "If an account exists for this email, a password reset link has been sent."
+      );
+    } catch (error) {
+      console.error(error);
+
+      setLoginError(
+        error.message ||
+          "Unable to send password reset email."
+      );
+    } finally {
+      setResetLoading(false);
+    }
+  }
+
+  async function handleUpdatePassword(event) {
+    event.preventDefault();
+
+    try {
+      setUpdatePasswordLoading(true);
+      setUpdatePasswordError("");
+
+      if (newPassword.length < 8) {
+        throw new Error(
+          "Password must be at least 8 characters."
+        );
+      }
+
+      if (newPassword !== confirmPassword) {
+        throw new Error(
+          "Passwords do not match."
+        );
+      }
+
+      const { error } =
+        await supabase.auth.updateUser({
+          password: newPassword
+        });
+
+      if (error) {
+        throw error;
+      }
+
+      await supabase.auth.signOut();
+
+      setSession(null);
+      setRecoveryMode(false);
+      setResetMode(false);
+      setNewPassword("");
+      setConfirmPassword("");
+      setPassword("");
+      setLoginError("");
+
+      setResetMessage(
+        "Your password has been updated successfully. You can now sign in with your new password."
+      );
+    } catch (error) {
+      console.error(error);
+
+      setUpdatePasswordError(
+        error.message ||
+          "Unable to update password."
+      );
+    } finally {
+      setUpdatePasswordLoading(false);
     }
   }
 
@@ -134,7 +253,9 @@ function App() {
 
   async function fetchApi(endpoint) {
     if (!session?.access_token) {
-      throw new Error("Authentication session is missing");
+      throw new Error(
+        "Authentication session is missing"
+      );
     }
 
     const response = await fetch(
@@ -148,7 +269,9 @@ function App() {
     );
 
     if (!response.ok) {
-      const result = await response.json().catch(() => null);
+      const result = await response.json().catch(
+        () => null
+      );
 
       throw new Error(
         result?.error?.message ||
@@ -169,7 +292,7 @@ function App() {
   }
 
   useEffect(() => {
-    if (!session) {
+    if (!session || recoveryMode) {
       setBots([]);
       setCategories([]);
       setUsers([]);
@@ -226,7 +349,7 @@ function App() {
     return () => {
       mounted = false;
     };
-  }, [session]);
+  }, [session, recoveryMode]);
 
   if (authLoading) {
     return (
@@ -241,74 +364,256 @@ function App() {
     );
   }
 
-  if (!session) {
+  if (recoveryMode) {
     return (
       <div className="auth-page">
         <section className="auth-card">
-          <h1>FINDLY ADMIN</h1>
+          <h1>Set New Password</h1>
 
           <p>
-            Sign in to access the control center.
+            Create a new secure password for your FINDLY Admin account.
           </p>
 
           <form
             className="auth-form"
-            onSubmit={handleLogin}
+            onSubmit={handleUpdatePassword}
           >
             <div className="auth-field">
-              <label htmlFor="email">
-                Email
+              <label htmlFor="new-password">
+                New Password
               </label>
 
               <input
-                id="email"
-                type="email"
-                value={email}
-                onChange={(event) =>
-                  setEmail(event.target.value)
-                }
-                placeholder="Enter your email"
-                autoComplete="email"
-                required
-              />
-            </div>
-
-            <div className="auth-field">
-              <label htmlFor="password">
-                Password
-              </label>
-
-              <input
-                id="password"
+                id="new-password"
                 type="password"
-                value={password}
+                value={newPassword}
                 onChange={(event) =>
-                  setPassword(
+                  setNewPassword(
                     event.target.value
                   )
                 }
-                placeholder="Enter your password"
-                autoComplete="current-password"
+                placeholder="Enter new password"
+                autoComplete="new-password"
+                minLength={8}
                 required
               />
             </div>
 
-            {loginError && (
+            <div className="auth-field">
+              <label htmlFor="confirm-password">
+                Confirm Password
+              </label>
+
+              <input
+                id="confirm-password"
+                type="password"
+                value={confirmPassword}
+                onChange={(event) =>
+                  setConfirmPassword(
+                    event.target.value
+                  )
+                }
+                placeholder="Confirm new password"
+                autoComplete="new-password"
+                minLength={8}
+                required
+              />
+            </div>
+
+            <div className="password-requirements">
+              <strong>
+                Password requirements
+              </strong>
+
+              <span>
+                • At least 8 characters
+              </span>
+
+              <span>
+                • Both password fields must match
+              </span>
+            </div>
+
+            {updatePasswordError && (
               <div className="auth-error">
-                {loginError}
+                {updatePasswordError}
               </div>
             )}
 
             <button
               className="auth-button"
               type="submit"
-              disabled={loginLoading}
+              disabled={
+                updatePasswordLoading
+              }
             >
-              {loginLoading
-                ? "Signing in..."
-                : "Sign In"}
+              {updatePasswordLoading
+                ? "Updating password..."
+                : "Update Password"}
             </button>
           </form>
+        </section>
+      </div>
+    );
+  }
+
+  if (!session) {
+    return (
+      <div className="auth-page">
+        <section className="auth-card">
+          <h1>FINDLY ADMIN</h1>
+
+          {!resetMode ? (
+            <>
+              <p>
+                Sign in to access the control center.
+              </p>
+
+              <form
+                className="auth-form"
+                onSubmit={handleLogin}
+              >
+                <div className="auth-field">
+                  <label htmlFor="email">
+                    Email
+                  </label>
+
+                  <input
+                    id="email"
+                    type="email"
+                    value={email}
+                    onChange={(event) =>
+                      setEmail(
+                        event.target.value
+                      )
+                    }
+                    placeholder="Enter your email"
+                    autoComplete="email"
+                    required
+                  />
+                </div>
+
+                <div className="auth-field">
+                  <label htmlFor="password">
+                    Password
+                  </label>
+
+                  <input
+                    id="password"
+                    type="password"
+                    value={password}
+                    onChange={(event) =>
+                      setPassword(
+                        event.target.value
+                      )
+                    }
+                    placeholder="Enter your password"
+                    autoComplete="current-password"
+                    required
+                  />
+                </div>
+
+                {loginError && (
+                  <div className="auth-error">
+                    {loginError}
+                  </div>
+                )}
+
+                {resetMessage && (
+                  <div className="auth-success">
+                    {resetMessage}
+                  </div>
+                )}
+
+                <button
+                  className="auth-button"
+                  type="submit"
+                  disabled={loginLoading}
+                >
+                  {loginLoading
+                    ? "Signing in..."
+                    : "Sign In"}
+                </button>
+
+                <button
+                  className="auth-link"
+                  type="button"
+                  onClick={() => {
+                    setResetMode(true);
+                    setLoginError("");
+                    setResetMessage("");
+                  }}
+                >
+                  Forgot Password?
+                </button>
+              </form>
+            </>
+          ) : (
+            <>
+              <p>
+                Enter your email and we'll send you a secure password reset link.
+              </p>
+
+              <form
+                className="auth-form"
+                onSubmit={handlePasswordReset}
+              >
+                <div className="auth-field">
+                  <label htmlFor="reset-email">
+                    Email
+                  </label>
+
+                  <input
+                    id="reset-email"
+                    type="email"
+                    value={email}
+                    onChange={(event) =>
+                      setEmail(
+                        event.target.value
+                      )
+                    }
+                    placeholder="Enter your email"
+                    autoComplete="email"
+                    required
+                  />
+                </div>
+
+                {loginError && (
+                  <div className="auth-error">
+                    {loginError}
+                  </div>
+                )}
+
+                {resetMessage && (
+                  <div className="auth-success">
+                    {resetMessage}
+                  </div>
+                )}
+
+                <button
+                  className="auth-button"
+                  type="submit"
+                  disabled={resetLoading}
+                >
+                  {resetLoading
+                    ? "Sending..."
+                    : "Send Reset Email"}
+                </button>
+
+                <button
+                  className="auth-link"
+                  type="button"
+                  onClick={() => {
+                    setResetMode(false);
+                    setLoginError("");
+                    setResetMessage("");
+                  }}
+                >
+                  Back to Sign In
+                </button>
+              </form>
+            </>
+          )}
         </section>
       </div>
     );
