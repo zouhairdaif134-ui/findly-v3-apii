@@ -4,23 +4,23 @@ import { supabase } from "./supabase.js";
 const API_URL =
   "https://findly-v3-api.berrchidcity99.workers.dev";
 
-const MENU = [
-  ["🏠", "Overview"],
-  ["🤖", "Bots"],
-  ["🗂️", "Categories"],
-  ["🔘", "Menus"],
-  ["🗃️", "Content"],
-  ["👥", "Users"],
-  ["🔔", "Notifications"],
-  ["📊", "Analytics"],
-  ["💰", "Monetization"],
-  ["🤖", "AI"],
-  ["👤", "Admins"],
-  ["📝", "Activity Log"],
-  ["⚙️", "Settings"]
+const menu = [
+  { icon: "🏠", label: "Overview" },
+  { icon: "🤖", label: "Bots" },
+  { icon: "🗂️", label: "Categories" },
+  { icon: "🔘", label: "Menus" },
+  { icon: "🗃️", label: "Content" },
+  { icon: "👥", label: "Users" },
+  { icon: "🔔", label: "Notifications" },
+  { icon: "📊", label: "Analytics" },
+  { icon: "💰", label: "Monetization" },
+  { icon: "🤖", label: "AI" },
+  { icon: "👤", label: "Admins" },
+  { icon: "📝", label: "Activity Log" },
+  { icon: "⚙️", label: "Settings" }
 ];
 
-const EMPTY_BOT = {
+const emptyBot = {
   name: "",
   slug: "",
   bot_type: "child",
@@ -31,7 +31,7 @@ const EMPTY_BOT = {
   sort_order: 0
 };
 
-const EMPTY_CATEGORY = {
+const emptyCategory = {
   name: "",
   slug: "",
   icon: "📁",
@@ -40,7 +40,7 @@ const EMPTY_CATEGORY = {
   sort_order: 0
 };
 
-const EMPTY_MENU = {
+const emptyMenu = {
   bot_id: "",
   parent_id: "",
   label: "",
@@ -51,7 +51,7 @@ const EMPTY_MENU = {
   sort_order: 0
 };
 
-const EMPTY_CONTENT = {
+const emptyContent = {
   bot_id: "",
   category_id: "",
   content_type: "general",
@@ -82,9 +82,11 @@ function App() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [updatePasswordLoading, setUpdatePasswordLoading] =
     useState(false);
-  const [updatePasswordError, setUpdatePasswordError] = useState("");
+  const [updatePasswordError, setUpdatePasswordError] =
+    useState("");
 
-  const [activeSection, setActiveSection] = useState("Overview");
+  const [activeSection, setActiveSection] =
+    useState("Overview");
 
   const [bots, setBots] = useState([]);
   const [categories, setCategories] = useState([]);
@@ -96,53 +98,61 @@ function App() {
   const [apiError, setApiError] = useState("");
 
   const [botModal, setBotModal] = useState(null);
-  const [botForm, setBotForm] = useState({ ...EMPTY_BOT });
+  const [botForm, setBotForm] = useState({
+    ...emptyBot
+  });
   const [botSaving, setBotSaving] = useState(false);
-  const [botError, setBotError] = useState("");
+  const [botFormError, setBotFormError] = useState("");
 
   const [categoryModal, setCategoryModal] = useState(null);
-  const [categoryForm, setCategoryForm] =
-    useState({ ...EMPTY_CATEGORY });
+  const [categoryForm, setCategoryForm] = useState({
+    ...emptyCategory
+  });
   const [categorySaving, setCategorySaving] = useState(false);
-  const [categoryError, setCategoryError] = useState("");
+  const [categoryFormError, setCategoryFormError] =
+    useState("");
 
   const [menuModal, setMenuModal] = useState(null);
-  const [menuForm, setMenuForm] = useState({ ...EMPTY_MENU });
+  const [menuForm, setMenuForm] = useState({
+    ...emptyMenu
+  });
   const [menuSaving, setMenuSaving] = useState(false);
-  const [menuError, setMenuError] = useState("");
+  const [menuFormError, setMenuFormError] = useState("");
   const [menuBotFilter, setMenuBotFilter] = useState("");
 
   const [contentModal, setContentModal] = useState(null);
-  const [contentForm, setContentForm] =
-    useState({ ...EMPTY_CONTENT });
+  const [contentForm, setContentForm] = useState({
+    ...emptyContent
+  });
   const [contentSaving, setContentSaving] = useState(false);
-  const [contentError, setContentError] = useState("");
-  const [contentBotFilter, setContentBotFilter] = useState("");
+  const [contentFormError, setContentFormError] =
+    useState("");
+  const [contentBotFilter, setContentBotFilter] =
+    useState("");
   const [contentCategoryFilter, setContentCategoryFilter] =
     useState("");
 
   const [userBotFilter, setUserBotFilter] = useState("");
 
-  const [telegramLoading, setTelegramLoading] = useState(false);
-  const [telegramMessage, setTelegramMessage] = useState("");
-  const [telegramError, setTelegramError] = useState("");
-
   useEffect(() => {
     let mounted = true;
 
-    async function restoreSession() {
+    async function loadSession() {
       try {
         const {
-          data: { session: currentSession }
+          data: { session }
         } = await supabase.auth.getSession();
 
         if (mounted) {
-          setSession(currentSession);
+          setSession(session);
         }
       } catch (error) {
+        console.error(error);
+
         if (mounted) {
           setLoginError(
-            error.message || "Failed to restore session."
+            error.message ||
+              "Failed to restore session"
           );
         }
       } finally {
@@ -152,21 +162,24 @@ function App() {
       }
     }
 
-    restoreSession();
+    loadSession();
 
     const {
       data: { subscription }
     } = supabase.auth.onAuthStateChange(
-      (event, currentSession) => {
-        if (!mounted) return;
+      (event, session) => {
+        if (!mounted) {
+          return;
+        }
 
         if (event === "PASSWORD_RECOVERY") {
           setRecoveryMode(true);
           setResetMode(false);
           setLoginError("");
+          setUpdatePasswordError("");
         }
 
-        setSession(currentSession);
+        setSession(session);
         setAuthLoading(false);
       }
     );
@@ -177,55 +190,40 @@ function App() {
     };
   }, []);
 
-  useEffect(() => {
-    if (!session || recoveryMode) {
-      setBots([]);
-      setCategories([]);
-      setMenus([]);
-      setUsers([]);
-      setContent([]);
-      return;
-    }
-
-    loadDashboard();
-  }, [session, recoveryMode]);
-
-  useEffect(() => {
-    if (
-      session &&
-      !recoveryMode &&
-      activeSection === "Menus" &&
-      menuBotFilter
-    ) {
-      loadMenus(menuBotFilter);
-    }
-  }, [menuBotFilter, activeSection]);
-
-  async function login(event) {
+  async function handleLogin(event) {
     event.preventDefault();
 
     try {
       setLoginLoading(true);
       setLoginError("");
-      setResetMessage("");
+
+      const cleanEmail = email.trim();
 
       const { error } =
         await supabase.auth.signInWithPassword({
-          email: email.trim(),
+          email: cleanEmail,
           password
         });
 
-      if (error) throw error;
+      if (error) {
+        throw error;
+      }
 
       setPassword("");
+      setResetMode(false);
+      setResetMessage("");
     } catch (error) {
-      setLoginError(error.message || "Login failed.");
+      console.error(error);
+
+      setLoginError(
+        error.message || "Login failed"
+      );
     } finally {
       setLoginLoading(false);
     }
   }
 
-  async function sendResetEmail(event) {
+  async function handlePasswordReset(event) {
     event.preventDefault();
 
     try {
@@ -233,33 +231,43 @@ function App() {
       setLoginError("");
       setResetMessage("");
 
-      if (!email.trim()) {
-        throw new Error("Enter your email address.");
+      const cleanEmail = email.trim();
+
+      if (!cleanEmail) {
+        throw new Error(
+          "Please enter your email address."
+        );
       }
 
       const { error } =
         await supabase.auth.resetPasswordForEmail(
-          email.trim(),
+          cleanEmail,
           {
-            redirectTo: window.location.origin
+            redirectTo:
+              window.location.origin
           }
         );
 
-      if (error) throw error;
+      if (error) {
+        throw error;
+      }
 
       setResetMessage(
-        "If the account exists, a password reset email has been sent."
+        "If an account exists for this email, a password reset link has been sent."
       );
     } catch (error) {
+      console.error(error);
+
       setLoginError(
-        error.message || "Unable to send reset email."
+        error.message ||
+          "Unable to send password reset email."
       );
     } finally {
       setResetLoading(false);
     }
   }
 
-  async function updatePassword(event) {
+  async function handleUpdatePassword(event) {
     event.preventDefault();
 
     try {
@@ -268,12 +276,14 @@ function App() {
 
       if (newPassword.length < 8) {
         throw new Error(
-          "Password must contain at least 8 characters."
+          "Password must be at least 8 characters."
         );
       }
 
       if (newPassword !== confirmPassword) {
-        throw new Error("Passwords do not match.");
+        throw new Error(
+          "Passwords do not match."
+        );
       }
 
       const { error } =
@@ -281,7 +291,9 @@ function App() {
           password: newPassword
         });
 
-      if (error) throw error;
+      if (error) {
+        throw error;
+      }
 
       await supabase.auth.signOut();
 
@@ -291,26 +303,50 @@ function App() {
       setNewPassword("");
       setConfirmPassword("");
       setPassword("");
+      setLoginError("");
 
       setResetMessage(
-        "Password updated successfully. You can now sign in."
+        "Your password has been updated successfully. You can now sign in with your new password."
       );
     } catch (error) {
+      console.error(error);
+
       setUpdatePasswordError(
-        error.message || "Unable to update password."
+        error.message ||
+          "Unable to update password."
       );
     } finally {
       setUpdatePasswordLoading(false);
     }
   }
 
-  async function logout() {
-    await supabase.auth.signOut();
+  async function handleLogout() {
+    try {
+      setApiError("");
+
+      const { error } =
+        await supabase.auth.signOut();
+
+      if (error) {
+        throw error;
+      }
+    } catch (error) {
+      console.error(error);
+
+      setApiError(
+        error.message || "Logout failed"
+      );
+    }
   }
 
-  async function fetchApi(endpoint, options = {}) {
+  async function fetchApi(
+    endpoint,
+    options = {}
+  ) {
     if (!session?.access_token) {
-      throw new Error("Authentication session is missing.");
+      throw new Error(
+        "Authentication session is missing"
+      );
     }
 
     const response = await fetch(
@@ -320,19 +356,25 @@ function App() {
         headers: {
           Authorization:
             `Bearer ${session.access_token}`,
-          "Content-Type": "application/json",
+          "Content-Type":
+            "application/json",
           ...(options.headers || {})
         }
       }
     );
 
     const result =
-      await response.json().catch(() => null);
+      await response.json().catch(
+        () => null
+      );
 
-    if (!response.ok || !result?.success) {
+    if (
+      !response.ok ||
+      !result?.success
+    ) {
       throw new Error(
         result?.error?.message ||
-          `API request failed (${response.status})`
+          `API ${response.status}`
       );
     }
 
@@ -340,7 +382,12 @@ function App() {
   }
 
   async function loadDashboard() {
-    if (!session?.access_token || recoveryMode) return;
+    if (
+      !session?.access_token ||
+      recoveryMode
+    ) {
+      return;
+    }
 
     try {
       setLoading(true);
@@ -359,107 +406,162 @@ function App() {
       ]);
 
       setBots(botsData || []);
-      setCategories(categoriesData || []);
+      setCategories(
+        categoriesData || []
+      );
       setUsers(usersData || []);
       setContent(contentData || []);
 
       if (menuBotFilter) {
-        await loadMenus(menuBotFilter);
+        const menusData =
+          await fetchApi(
+            `/api/menus?bot=${encodeURIComponent(
+              getBotSlug(menuBotFilter)
+            )}`
+          );
+
+        setMenus(menusData || []);
+      } else {
+        setMenus([]);
       }
     } catch (error) {
+      console.error(error);
+
       setApiError(
-        error.message || "Failed to load dashboard."
+        error.message ||
+          "Failed to load dashboard"
       );
     } finally {
       setLoading(false);
     }
   }
 
-  async function loadMenus(botId) {
-    if (!botId) {
-      setMenus([]);
-      return;
-    }
-
+  async function loadMenus(botId = "") {
     try {
-      const slug = getBotSlug(botId);
+      setApiError("");
+
+      if (!botId) {
+        setMenus([]);
+        return;
+      }
+
+      const slug =
+        getBotSlug(botId);
 
       if (!slug) {
         setMenus([]);
         return;
       }
 
-      const data = await fetchApi(
-        `/api/menus?bot=${encodeURIComponent(slug)}`
-      );
+      const data =
+        await fetchApi(
+          `/api/menus?bot=${encodeURIComponent(
+            slug
+          )}`
+        );
 
       setMenus(data || []);
     } catch (error) {
+      console.error(error);
+
       setApiError(
-        error.message || "Failed to load menus."
+        error.message ||
+          "Failed to load menus"
       );
     }
   }
 
-  function getBotSlug(id) {
+  useEffect(() => {
+    if (!session || recoveryMode) {
+      setBots([]);
+      setCategories([]);
+      setMenus([]);
+      setUsers([]);
+      setContent([]);
+      setLoading(false);
+      return;
+    }
+
+    loadDashboard();
+  }, [session, recoveryMode]);
+
+  useEffect(() => {
+    if (
+      session &&
+      !recoveryMode &&
+      activeSection === "Menus"
+    ) {
+      loadMenus(menuBotFilter);
+    }
+  }, [
+    menuBotFilter,
+    activeSection
+  ]);
+
+  function getBotSlug(botId) {
     return (
-      bots.find((bot) => bot.id === id)?.slug || ""
+      bots.find(
+        (bot) => bot.id === botId
+      )?.slug || ""
     );
   }
 
-  function getBotName(id) {
+  function getBotName(botId) {
     return (
-      bots.find((bot) => bot.id === id)?.name ||
-      "Unknown bot"
+      bots.find(
+        (bot) => bot.id === botId
+      )?.name || "Unknown bot"
     );
   }
 
-  function getCategoryName(id) {
+  function getCategoryName(
+    categoryId
+  ) {
     return (
       categories.find(
-        (category) => category.id === id
+        (category) =>
+          category.id === categoryId
       )?.name || "No category"
     );
   }
 
-  async function setupTelegramWebhook() {
-    try {
-      setTelegramLoading(true);
-      setTelegramMessage("");
-      setTelegramError("");
+  function openCreateBot() {
+    setBotForm({
+      ...emptyBot
+    });
 
-      const masterBot =
-        bots.find((bot) => bot.bot_type === "master") ||
-        bots.find((bot) => bot.slug === "findly");
+    setBotFormError("");
+    setBotModal("create");
+  }
 
-      if (!masterBot) {
-        throw new Error(
-          "FINDLY master bot was not found in the database."
-        );
-      }
+  function openEditBot(bot) {
+    setBotForm({
+      name: bot.name || "",
+      slug: bot.slug || "",
+      bot_type:
+        bot.bot_type || "child",
+      telegram_username:
+        bot.telegram_username || "",
+      description:
+        bot.description || "",
+      icon: bot.icon || "🤖",
+      is_active:
+        bot.is_active !== false,
+      sort_order:
+        bot.sort_order ?? 0
+    });
 
-      const result = await fetchApi(
-        `/api/telegram/webhook/${encodeURIComponent(
-          masterBot.slug
-        )}`,
-        {
-          method: "POST"
-        }
-      );
+    setBotFormError("");
+    setBotModal(bot);
+  }
 
-      setTelegramMessage(
-        `Webhook connected successfully for ${masterBot.slug}.`
-      );
-
-      console.log("Telegram webhook:", result);
-    } catch (error) {
-      setTelegramError(
-        error.message ||
-          "Unable to connect Telegram webhook."
-      );
-    } finally {
-      setTelegramLoading(false);
+  function closeBotModal() {
+    if (botSaving) {
+      return;
     }
+
+    setBotModal(null);
+    setBotFormError("");
   }
 
   async function saveBot(event) {
@@ -467,14 +569,17 @@ function App() {
 
     try {
       setBotSaving(true);
-      setBotError("");
+      setBotFormError("");
+      setApiError("");
 
-      if (!botForm.name.trim()) {
-        throw new Error("Bot name is required.");
-      }
-
-      if (!botForm.slug.trim()) {
-        throw new Error("Bot slug is required.");
+      if (
+        !botForm.name.trim() ||
+        !botForm.slug.trim() ||
+        !botForm.bot_type.trim()
+      ) {
+        throw new Error(
+          "Name, slug and bot type are required."
+        );
       }
 
       const payload = {
@@ -482,31 +587,48 @@ function App() {
         name: botForm.name.trim(),
         slug: botForm.slug.trim(),
         telegram_username:
-          botForm.telegram_username.trim() || null,
+          botForm.telegram_username.trim() ||
+          null,
         description:
-          botForm.description.trim() || null,
-        icon: botForm.icon.trim() || "🤖",
+          botForm.description.trim() ||
+          null,
+        icon:
+          botForm.icon.trim() ||
+          "🤖",
         sort_order:
           Number(botForm.sort_order) || 0
       };
 
       if (botModal === "create") {
-        await fetchApi("/api/bots", {
-          method: "POST",
-          body: JSON.stringify(payload)
-        });
+        await fetchApi(
+          "/api/bots",
+          {
+            method: "POST",
+            body: JSON.stringify(
+              payload
+            )
+          }
+        );
       } else {
-        await fetchApi(`/api/bots/${botModal.id}`, {
-          method: "PUT",
-          body: JSON.stringify(payload)
-        });
+        await fetchApi(
+          `/api/bots/${botModal.id}`,
+          {
+            method: "PUT",
+            body: JSON.stringify(
+              payload
+            )
+          }
+        );
       }
 
       setBotModal(null);
       await loadDashboard();
     } catch (error) {
-      setBotError(
-        error.message || "Unable to save bot."
+      console.error(error);
+
+      setBotFormError(
+        error.message ||
+          "Unable to save bot."
       );
     } finally {
       setBotSaving(false);
@@ -517,280 +639,34 @@ function App() {
     try {
       setApiError("");
 
-      await fetchApi(`/api/bots/${bot.id}`, {
-        method: "PUT",
-        body: JSON.stringify({
-          is_active: !bot.is_active
-        })
-      });
-
-      await loadDashboard();
-    } catch (error) {
-      setApiError(
-        error.message || "Unable to update bot."
-      );
-    }
-  }
-
-  async function saveCategory(event) {
-    event.preventDefault();
-
-    try {
-      setCategorySaving(true);
-      setCategoryError("");
-
-      if (!categoryForm.name.trim()) {
-        throw new Error("Category name is required.");
-      }
-
-      if (!categoryForm.slug.trim()) {
-        throw new Error("Category slug is required.");
-      }
-
-      const payload = {
-        ...categoryForm,
-        name: categoryForm.name.trim(),
-        slug: categoryForm.slug.trim(),
-        icon: categoryForm.icon.trim() || "📁",
-        description:
-          categoryForm.description.trim() || null,
-        sort_order:
-          Number(categoryForm.sort_order) || 0
-      };
-
-      if (categoryModal === "create") {
-        await fetchApi("/api/categories", {
-          method: "POST",
-          body: JSON.stringify(payload)
-        });
-      } else {
-        await fetchApi(
-          `/api/categories/${categoryModal.id}`,
-          {
-            method: "PUT",
-            body: JSON.stringify(payload)
-          }
-        );
-      }
-
-      setCategoryModal(null);
-      await loadDashboard();
-    } catch (error) {
-      setCategoryError(
-        error.message || "Unable to save category."
-      );
-    } finally {
-      setCategorySaving(false);
-    }
-  }
-
-  async function toggleCategory(category) {
-    try {
       await fetchApi(
-        `/api/categories/${category.id}`,
+        `/api/bots/${bot.id}`,
         {
           method: "PUT",
           body: JSON.stringify({
-            is_active: !category.is_active
+            is_active:
+              !bot.is_active
           })
         }
       );
 
       await loadDashboard();
     } catch (error) {
+      console.error(error);
+
       setApiError(
-        error.message || "Unable to update category."
+        error.message ||
+          "Unable to update bot."
       );
     }
-  }
-
-  async function saveMenu(event) {
-    event.preventDefault();
-
-    try {
-      setMenuSaving(true);
-      setMenuError("");
-
-      if (!menuForm.bot_id) {
-        throw new Error("Select a bot.");
-      }
-
-      if (!menuForm.label.trim()) {
-        throw new Error("Menu label is required.");
-      }
-
-      const payload = {
-        ...menuForm,
-        parent_id: menuForm.parent_id || null,
-        label: menuForm.label.trim(),
-        icon: menuForm.icon.trim() || "🔘",
-        action_type:
-          menuForm.action_type.trim() || "category",
-        action_value:
-          menuForm.action_value.trim() || null,
-        sort_order:
-          Number(menuForm.sort_order) || 0
-      };
-
-      if (menuModal === "create") {
-        await fetchApi("/api/menus", {
-          method: "POST",
-          body: JSON.stringify(payload)
-        });
-      } else {
-        await fetchApi(`/api/menus/${menuModal.id}`, {
-          method: "PUT",
-          body: JSON.stringify(payload)
-        });
-      }
-
-      setMenuModal(null);
-      setMenuBotFilter(payload.bot_id);
-      await loadMenus(payload.bot_id);
-    } catch (error) {
-      setMenuError(
-        error.message || "Unable to save menu."
-      );
-    } finally {
-      setMenuSaving(false);
-    }
-  }
-
-  async function toggleMenu(item) {
-    try {
-      await fetchApi(`/api/menus/${item.id}`, {
-        method: "PUT",
-        body: JSON.stringify({
-          is_active: !item.is_active
-        })
-      });
-
-      await loadMenus(item.bot_id);
-    } catch (error) {
-      setApiError(
-        error.message || "Unable to update menu."
-      );
-    }
-  }
-
-  async function saveContent(event) {
-    event.preventDefault();
-
-    try {
-      setContentSaving(true);
-      setContentError("");
-
-      if (!contentForm.bot_id) {
-        throw new Error("Select a bot.");
-      }
-
-      if (!contentForm.title.trim()) {
-        throw new Error("Content title is required.");
-      }
-
-      let metadata = {};
-
-      try {
-        metadata = JSON.parse(
-          contentForm.metadata || "{}"
-        );
-      } catch {
-        throw new Error(
-          "Metadata must contain valid JSON."
-        );
-      }
-
-      const payload = {
-        ...contentForm,
-        bot_id: contentForm.bot_id,
-        category_id:
-          contentForm.category_id || null,
-        content_type:
-          contentForm.content_type.trim() || "general",
-        title: contentForm.title.trim(),
-        description:
-          contentForm.description.trim() || null,
-        image_url:
-          contentForm.image_url.trim() || null,
-        external_url:
-          contentForm.external_url.trim() || null,
-        metadata,
-        published_at:
-          contentForm.published_at || null
-      };
-
-      if (contentModal === "create") {
-        await fetchApi("/api/content", {
-          method: "POST",
-          body: JSON.stringify(payload)
-        });
-      } else {
-        await fetchApi(
-          `/api/content/${contentModal.id}`,
-          {
-            method: "PUT",
-            body: JSON.stringify(payload)
-          }
-        );
-      }
-
-      setContentModal(null);
-      await loadDashboard();
-    } catch (error) {
-      setContentError(
-        error.message || "Unable to save content."
-      );
-    } finally {
-      setContentSaving(false);
-    }
-  }
-
-  async function toggleContent(item) {
-    try {
-      await fetchApi(
-        `/api/content/${item.id}`,
-        {
-          method: "PUT",
-          body: JSON.stringify({
-            is_active: !item.is_active
-          })
-        }
-      );
-
-      await loadDashboard();
-    } catch (error) {
-      setApiError(
-        error.message || "Unable to update content."
-      );
-    }
-  }
-
-  function openCreateBot() {
-    setBotForm({ ...EMPTY_BOT });
-    setBotError("");
-    setBotModal("create");
-  }
-
-  function openEditBot(bot) {
-    setBotForm({
-      name: bot.name || "",
-      slug: bot.slug || "",
-      bot_type: bot.bot_type || "child",
-      telegram_username:
-        bot.telegram_username || "",
-      description: bot.description || "",
-      icon: bot.icon || "🤖",
-      is_active: bot.is_active !== false,
-      sort_order: bot.sort_order ?? 0
-    });
-
-    setBotError("");
-    setBotModal(bot);
   }
 
   function openCreateCategory() {
-    setCategoryForm({ ...EMPTY_CATEGORY });
-    setCategoryError("");
+    setCategoryForm({
+      ...emptyCategory
+    });
+
+    setCategoryFormError("");
     setCategoryModal("create");
   }
 
@@ -799,131 +675,558 @@ function App() {
       name: category.name || "",
       slug: category.slug || "",
       icon: category.icon || "📁",
-      description: category.description || "",
-      is_active: category.is_active !== false,
-      sort_order: category.sort_order ?? 0
+      description:
+        category.description || "",
+      is_active:
+        category.is_active !== false,
+      sort_order:
+        category.sort_order ?? 0
     });
 
-    setCategoryError("");
+    setCategoryFormError("");
     setCategoryModal(category);
+  }
+
+  function closeCategoryModal() {
+    if (categorySaving) {
+      return;
+    }
+
+    setCategoryModal(null);
+    setCategoryFormError("");
+  }
+
+  async function saveCategory(event) {
+    event.preventDefault();
+
+    try {
+      setCategorySaving(true);
+      setCategoryFormError("");
+      setApiError("");
+
+      if (
+        !categoryForm.name.trim() ||
+        !categoryForm.slug.trim()
+      ) {
+        throw new Error(
+          "Name and slug are required."
+        );
+      }
+
+      const payload = {
+        ...categoryForm,
+        name:
+          categoryForm.name.trim(),
+        slug:
+          categoryForm.slug.trim(),
+        icon:
+          categoryForm.icon.trim() ||
+          "📁",
+        description:
+          categoryForm.description.trim() ||
+          null,
+        sort_order:
+          Number(
+            categoryForm.sort_order
+          ) || 0
+      };
+
+      if (
+        categoryModal === "create"
+      ) {
+        await fetchApi(
+          "/api/categories",
+          {
+            method: "POST",
+            body: JSON.stringify(
+              payload
+            )
+          }
+        );
+      } else {
+        await fetchApi(
+          `/api/categories/${categoryModal.id}`,
+          {
+            method: "PUT",
+            body: JSON.stringify(
+              payload
+            )
+          }
+        );
+      }
+
+      setCategoryModal(null);
+      await loadDashboard();
+    } catch (error) {
+      console.error(error);
+
+      setCategoryFormError(
+        error.message ||
+          "Unable to save category."
+      );
+    } finally {
+      setCategorySaving(false);
+    }
+  }
+
+  async function toggleCategory(
+    category
+  ) {
+    try {
+      setApiError("");
+
+      await fetchApi(
+        `/api/categories/${category.id}`,
+        {
+          method: "PUT",
+          body: JSON.stringify({
+            is_active:
+              !category.is_active
+          })
+        }
+      );
+
+      await loadDashboard();
+    } catch (error) {
+      console.error(error);
+
+      setApiError(
+        error.message ||
+          "Unable to update category."
+      );
+    }
   }
 
   function openCreateMenu() {
     if (!bots.length) {
       setApiError(
-        "Create a bot before creating a menu item."
+        "Create a bot first before creating a menu item."
       );
       return;
     }
 
-    const botId =
-      menuBotFilter || bots[0]?.id || "";
-
     setMenuForm({
-      ...EMPTY_MENU,
-      bot_id: botId
+      ...emptyMenu,
+      bot_id:
+        menuBotFilter ||
+        bots[0]?.id ||
+        ""
     });
 
-    setMenuError("");
+    setMenuFormError("");
     setMenuModal("create");
   }
 
   function openEditMenu(item) {
     setMenuForm({
-      bot_id: item.bot_id || "",
-      parent_id: item.parent_id || "",
-      label: item.label || "",
-      icon: item.icon || "🔘",
+      bot_id:
+        item.bot_id || "",
+      parent_id:
+        item.parent_id || "",
+      label:
+        item.label || "",
+      icon:
+        item.icon || "🔘",
       action_type:
-        item.action_type || "category",
-      action_value: item.action_value || "",
-      is_active: item.is_active !== false,
-      sort_order: item.sort_order ?? 0
+        item.action_type ||
+        "category",
+      action_value:
+        item.action_value || "",
+      is_active:
+        item.is_active !== false,
+      sort_order:
+        item.sort_order ?? 0
     });
 
-    setMenuError("");
+    setMenuFormError("");
     setMenuModal(item);
+  }
+
+  function closeMenuModal() {
+    if (menuSaving) {
+      return;
+    }
+
+    setMenuModal(null);
+    setMenuFormError("");
+  }
+
+  async function saveMenu(event) {
+    event.preventDefault();
+
+    try {
+      setMenuSaving(true);
+      setMenuFormError("");
+      setApiError("");
+
+      if (
+        !menuForm.bot_id ||
+        !menuForm.label.trim()
+      ) {
+        throw new Error(
+          "Bot and menu label are required."
+        );
+      }
+
+      const payload = {
+        ...menuForm,
+        parent_id:
+          menuForm.parent_id ||
+          null,
+        label:
+          menuForm.label.trim(),
+        icon:
+          menuForm.icon.trim() ||
+          "🔘",
+        action_type:
+          menuForm.action_type.trim() ||
+          "category",
+        action_value:
+          menuForm.action_value.trim() ||
+          null,
+        sort_order:
+          Number(
+            menuForm.sort_order
+          ) || 0
+      };
+
+      if (
+        menuModal === "create"
+      ) {
+        await fetchApi(
+          "/api/menus",
+          {
+            method: "POST",
+            body: JSON.stringify(
+              payload
+            )
+          }
+        );
+      } else {
+        await fetchApi(
+          `/api/menus/${menuModal.id}`,
+          {
+            method: "PUT",
+            body: JSON.stringify(
+              payload
+            )
+          }
+        );
+      }
+
+      setMenuModal(null);
+
+      setMenuBotFilter(
+        payload.bot_id
+      );
+
+      await loadMenus(
+        payload.bot_id
+      );
+    } catch (error) {
+      console.error(error);
+
+      setMenuFormError(
+        error.message ||
+          "Unable to save menu item."
+      );
+    } finally {
+      setMenuSaving(false);
+    }
+  }
+
+  async function toggleMenu(item) {
+    try {
+      setApiError("");
+
+      await fetchApi(
+        `/api/menus/${item.id}`,
+        {
+          method: "PUT",
+          body: JSON.stringify({
+            is_active:
+              !item.is_active
+          })
+        }
+      );
+
+      await loadMenus(
+        item.bot_id
+      );
+    } catch (error) {
+      console.error(error);
+
+      setApiError(
+        error.message ||
+          "Unable to update menu item."
+      );
+    }
   }
 
   function openCreateContent() {
     if (!bots.length) {
       setApiError(
-        "Create a bot before creating content."
+        "Create a bot first before creating content."
       );
       return;
     }
 
     setContentForm({
-      ...EMPTY_CONTENT,
+      ...emptyContent,
       bot_id:
         contentBotFilter ||
         bots[0]?.id ||
         ""
     });
 
-    setContentError("");
+    setContentFormError("");
     setContentModal("create");
   }
 
   function openEditContent(item) {
     setContentForm({
-      bot_id: item.bot_id || "",
-      category_id: item.category_id || "",
+      bot_id:
+        item.bot_id || "",
+      category_id:
+        item.category_id || "",
       content_type:
-        item.content_type || "general",
-      title: item.title || "",
-      description: item.description || "",
-      image_url: item.image_url || "",
-      external_url: item.external_url || "",
-      metadata: JSON.stringify(
-        item.metadata || {},
-        null,
-        2
-      ),
-      is_active: item.is_active !== false,
+        item.content_type ||
+        "general",
+      title:
+        item.title || "",
+      description:
+        item.description || "",
+      image_url:
+        item.image_url || "",
+      external_url:
+        item.external_url || "",
+      metadata:
+        JSON.stringify(
+          item.metadata || {},
+          null,
+          2
+        ),
+      is_active:
+        item.is_active !== false,
       published_at:
         item.published_at
-          ? toDateTimeLocal(item.published_at)
+          ? item.published_at.slice(
+              0,
+              16
+            )
           : ""
     });
 
-    setContentError("");
+    setContentFormError("");
     setContentModal(item);
   }
 
-  const visibleContent = content.filter((item) => {
-    if (
-      contentBotFilter &&
-      item.bot_id !== contentBotFilter
-    ) {
-      return false;
+  function closeContentModal() {
+    if (contentSaving) {
+      return;
     }
 
-    if (
-      contentCategoryFilter &&
-      item.category_id !== contentCategoryFilter
-    ) {
-      return false;
+    setContentModal(null);
+    setContentFormError("");
+  }
+
+  async function saveContent(event) {
+    event.preventDefault();
+
+    try {
+      setContentSaving(true);
+      setContentFormError("");
+      setApiError("");
+
+      if (
+        !contentForm.bot_id ||
+        !contentForm.title.trim()
+      ) {
+        throw new Error(
+          "Bot and content title are required."
+        );
+      }
+
+      let metadata = {};
+
+      if (
+        contentForm.metadata.trim()
+      ) {
+        try {
+          metadata = JSON.parse(
+            contentForm.metadata
+          );
+        } catch {
+          throw new Error(
+            "Metadata must be valid JSON."
+          );
+        }
+      }
+
+      const payload = {
+        ...contentForm,
+        category_id:
+          contentForm.category_id ||
+          null,
+        content_type:
+          contentForm.content_type.trim() ||
+          "general",
+        title:
+          contentForm.title.trim(),
+        description:
+          contentForm.description.trim() ||
+          null,
+        image_url:
+          contentForm.image_url.trim() ||
+          null,
+        external_url:
+          contentForm.external_url.trim() ||
+          null,
+        metadata,
+        published_at:
+          contentForm.published_at
+            ? new Date(
+                contentForm.published_at
+              ).toISOString()
+            : null
+      };
+
+      if (
+        contentModal === "create"
+      ) {
+        await fetchApi(
+          "/api/content",
+          {
+            method: "POST",
+            body: JSON.stringify(
+              payload
+            )
+          }
+        );
+      } else {
+        await fetchApi(
+          `/api/content/${contentModal.id}`,
+          {
+            method: "PUT",
+            body: JSON.stringify(
+              payload
+            )
+          }
+        );
+      }
+
+      setContentModal(null);
+      await loadDashboard();
+    } catch (error) {
+      console.error(error);
+
+      setContentFormError(
+        error.message ||
+          "Unable to save content."
+      );
+    } finally {
+      setContentSaving(false);
     }
+  }
 
-    return true;
-  });
+  async function toggleContent(item) {
+    try {
+      setApiError("");
 
-  const visibleUsers = users.filter((user) => {
-    if (!userBotFilter) return true;
-    return true;
-  });
+      await fetchApi(
+        `/api/content/${item.id}`,
+        {
+          method: "PUT",
+          body: JSON.stringify({
+            is_active:
+              !item.is_active
+          })
+        }
+      );
 
-  const activeBots =
-    bots.filter((bot) => bot.is_active).length;
+      await loadDashboard();
+    } catch (error) {
+      console.error(error);
+
+      setApiError(
+        error.message ||
+          "Unable to update content."
+      );
+    }
+  }
+
+  async function toggleUser(user) {
+    try {
+      setApiError("");
+
+      await fetchApi(
+        `/api/users/${user.id}`,
+        {
+          method: "PUT",
+          body: JSON.stringify({
+            is_active:
+              !user.is_active
+          })
+        }
+      );
+
+      const data =
+        userBotFilter
+          ? await fetchApi(
+              `/api/users?bot_id=${encodeURIComponent(
+                userBotFilter
+              )}`
+            )
+          : await fetchApi(
+              "/api/users"
+            );
+
+      setUsers(data || []);
+    } catch (error) {
+      console.error(error);
+
+      setApiError(
+        error.message ||
+          "Unable to update user."
+      );
+    }
+  }
+
+  async function reloadUsers() {
+    try {
+      setApiError("");
+
+      const data =
+        userBotFilter
+          ? await fetchApi(
+              `/api/users?bot_id=${encodeURIComponent(
+                userBotFilter
+              )}`
+            )
+          : await fetchApi(
+              "/api/users"
+            );
+
+      setUsers(data || []);
+    } catch (error) {
+      console.error(error);
+
+      setApiError(
+        error.message ||
+          "Unable to load users."
+      );
+    }
+  }
 
   if (authLoading) {
     return (
       <div className="auth-page">
-        <div className="auth-card">
-          <h1>FINDLY</h1>
-          <p>Loading secure dashboard...</p>
-        </div>
+        <section className="auth-card">
+          <h1>FINDLY ADMIN</h1>
+          <p>
+            Checking secure session...
+          </p>
+        </section>
       </div>
     );
   }
@@ -931,122 +1234,299 @@ function App() {
   if (recoveryMode) {
     return (
       <div className="auth-page">
-        <div className="auth-card">
-          <h1>Set new password</h1>
+        <section className="auth-card">
+          <h1>
+            Set New Password
+          </h1>
+
           <p>
-            Choose a new password for your FINDLY
-            owner account.
+            Create a new secure
+            password for your FINDLY
+            Admin account.
           </p>
 
           <form
             className="auth-form"
-            onSubmit={updatePassword}
+            onSubmit={
+              handleUpdatePassword
+            }
           >
-            <div className="auth-field">
-              <label>New password</label>
-              <input
-                type="password"
-                value={newPassword}
-                onChange={(e) =>
-                  setNewPassword(e.target.value)
-                }
-                minLength={8}
-                required
-              />
-            </div>
+            <FormField
+              label="New Password"
+              type="password"
+              value={newPassword}
+              onChange={
+                setNewPassword
+              }
+              placeholder="Enter new password"
+              required
+            />
 
-            <div className="auth-field">
-              <label>Confirm password</label>
-              <input
-                type="password"
-                value={confirmPassword}
-                onChange={(e) =>
-                  setConfirmPassword(e.target.value)
-                }
-                minLength={8}
-                required
-              />
+            <FormField
+              label="Confirm Password"
+              type="password"
+              value={
+                confirmPassword
+              }
+              onChange={
+                setConfirmPassword
+              }
+              placeholder="Confirm new password"
+              required
+            />
+
+            <div className="password-requirements">
+              <strong>
+                Password requirements
+              </strong>
+              <span>
+                • At least 8 characters
+              </span>
+              <span>
+                • Both password fields must match
+              </span>
             </div>
 
             {updatePasswordError && (
               <div className="auth-error">
-                {updatePasswordError}
+                {
+                  updatePasswordError
+                }
               </div>
             )}
 
             <button
               className="auth-button"
-              disabled={updatePasswordLoading}
+              type="submit"
+              disabled={
+                updatePasswordLoading
+              }
             >
               {updatePasswordLoading
-                ? "Updating..."
-                : "Update password"}
+                ? "Updating password..."
+                : "Update Password"}
             </button>
           </form>
-        </div>
+        </section>
       </div>
     );
   }
 
   if (!session) {
     return (
-      <LoginPage
-        email={email}
-        password={password}
-        resetMode={resetMode}
-        loading={loginLoading || resetLoading}
-        error={loginError}
-        message={resetMessage}
-        onEmail={setEmail}
-        onPassword={setPassword}
-        onLogin={login}
-        onReset={sendResetEmail}
-        onToggleReset={() => {
-          setResetMode(!resetMode);
-          setLoginError("");
-          setResetMessage("");
-        }}
-      />
+      <div className="auth-page">
+        <section className="auth-card">
+          <h1>FINDLY ADMIN</h1>
+
+          {!resetMode ? (
+            <>
+              <p>
+                Sign in to access the
+                control center.
+              </p>
+
+              <form
+                className="auth-form"
+                onSubmit={handleLogin}
+              >
+                <FormField
+                  label="Email"
+                  type="email"
+                  value={email}
+                  onChange={setEmail}
+                  placeholder="Enter your email"
+                  required
+                />
+
+                <FormField
+                  label="Password"
+                  type="password"
+                  value={password}
+                  onChange={
+                    setPassword
+                  }
+                  placeholder="Enter your password"
+                  required
+                />
+
+                {loginError && (
+                  <div className="auth-error">
+                    {loginError}
+                  </div>
+                )}
+
+                {resetMessage && (
+                  <div className="auth-success">
+                    {resetMessage}
+                  </div>
+                )}
+
+                <button
+                  className="auth-button"
+                  type="submit"
+                  disabled={
+                    loginLoading
+                  }
+                >
+                  {loginLoading
+                    ? "Signing in..."
+                    : "Sign In"}
+                </button>
+
+                <button
+                  className="auth-link"
+                  type="button"
+                  onClick={() => {
+                    setResetMode(
+                      true
+                    );
+                    setLoginError("");
+                    setResetMessage("");
+                  }}
+                >
+                  Forgot Password?
+                </button>
+              </form>
+            </>
+          ) : (
+            <>
+              <p>
+                Enter your email and
+                we'll send you a secure
+                password reset link.
+              </p>
+
+              <form
+                className="auth-form"
+                onSubmit={
+                  handlePasswordReset
+                }
+              >
+                <FormField
+                  label="Email"
+                  type="email"
+                  value={email}
+                  onChange={setEmail}
+                  placeholder="Enter your email"
+                  required
+                />
+
+                {loginError && (
+                  <div className="auth-error">
+                    {loginError}
+                  </div>
+                )}
+
+                {resetMessage && (
+                  <div className="auth-success">
+                    {resetMessage}
+                  </div>
+                )}
+
+                <button
+                  className="auth-button"
+                  type="submit"
+                  disabled={
+                    resetLoading
+                  }
+                >
+                  {resetLoading
+                    ? "Sending..."
+                    : "Send Reset Email"}
+                </button>
+
+                <button
+                  className="auth-link"
+                  type="button"
+                  onClick={() => {
+                    setResetMode(
+                      false
+                    );
+                    setLoginError("");
+                    setResetMessage("");
+                  }}
+                >
+                  Back to Sign In
+                </button>
+              </form>
+            </>
+          )}
+        </section>
+      </div>
     );
   }
+
+  const activeBots =
+    bots.filter(
+      (bot) => bot.is_active
+    ).length;
+
+  const activeCategories =
+    categories.filter(
+      (category) =>
+        category.is_active
+    ).length;
+
+  const activeContent =
+    content.filter(
+      (item) => item.is_active
+    ).length;
 
   return (
     <div className="app">
       <aside className="sidebar">
         <div className="brand">
-          <div className="brand-icon">🔎</div>
+          <div className="brand-icon">
+            F
+          </div>
+
           <div>
             <strong>FINDLY</strong>
-            <span>MASTER ADMIN</span>
+            <span>ADMIN</span>
           </div>
         </div>
 
         <nav>
-          {MENU.map(([icon, label]) => (
+          {menu.map((item) => (
             <button
-              key={label}
+              key={item.label}
               className={
                 "nav-item " +
-                (activeSection === label
+                (activeSection ===
+                item.label
                   ? "active"
                   : "")
               }
+              type="button"
               onClick={() =>
-                setActiveSection(label)
+                setActiveSection(
+                  item.label
+                )
               }
             >
-              <span>{icon}</span>
-              {label}
+              <span>
+                {item.icon}
+              </span>
+
+              <span>
+                {item.label}
+              </span>
             </button>
           ))}
         </nav>
 
         <div className="sidebar-footer">
           <div className="owner-badge">
-            <div className="avatar">👑</div>
+            <span>👑</span>
+
             <div>
-              <strong>FINDLY Owner</strong>
-              <small>Full control</small>
+              <strong>
+                Owner
+              </strong>
+
+              <small>
+                Full Access
+              </small>
             </div>
           </div>
         </div>
@@ -1055,34 +1535,51 @@ function App() {
       <main className="main">
         <header className="header">
           <div>
-            <h1>{activeSection}</h1>
+            <h1>
+              {activeSection}
+            </h1>
+
             <p>
-              FINDLY master control center
+              {getSectionDescription(
+                activeSection
+              )}
             </p>
           </div>
 
           <div className="header-actions">
             <button
               className="icon-button"
-              onClick={loadDashboard}
+              type="button"
+              onClick={
+                loadDashboard
+              }
               title="Refresh"
             >
               ↻
             </button>
 
             <div className="profile">
-              <div className="avatar">👑</div>
+              <div className="avatar">
+                F
+              </div>
+
               <div>
-                <strong>Owner</strong>
+                <strong>
+                  FINDLY Owner
+                </strong>
+
                 <small>
-                  {session.user?.email}
+                  Administrator
                 </small>
               </div>
             </div>
 
             <button
               className="secondary-button"
-              onClick={logout}
+              type="button"
+              onClick={
+                handleLogout
+              }
             >
               Logout
             </button>
@@ -1097,81 +1594,165 @@ function App() {
 
         {loading && (
           <div className="loading-bar">
-            Loading FINDLY data...
+            Loading dashboard...
           </div>
         )}
 
-        {activeSection === "Overview" && (
+        {activeSection ===
+          "Overview" && (
           <Overview
             bots={bots}
-            categories={categories}
+            categories={
+              categories
+            }
             users={users}
             content={content}
-            activeBots={activeBots}
+            activeBots={
+              activeBots
+            }
+            activeCategories={
+              activeCategories
+            }
+            activeContent={
+              activeContent
+            }
           />
         )}
 
-        {activeSection === "Bots" && (
+        {activeSection ===
+          "Bots" && (
           <BotsSection
             bots={bots}
-            onCreate={openCreateBot}
-            onEdit={openEditBot}
-            onToggle={toggleBot}
+            onCreate={
+              openCreateBot
+            }
+            onEdit={
+              openEditBot
+            }
+            onToggle={
+              toggleBot
+            }
           />
         )}
 
-        {activeSection === "Categories" && (
+        {activeSection ===
+          "Categories" && (
           <CategoriesSection
-            categories={categories}
-            onCreate={openCreateCategory}
-            onEdit={openEditCategory}
-            onToggle={toggleCategory}
+            categories={
+              categories
+            }
+            onCreate={
+              openCreateCategory
+            }
+            onEdit={
+              openEditCategory
+            }
+            onToggle={
+              toggleCategory
+            }
           />
         )}
 
-        {activeSection === "Menus" && (
+        {activeSection ===
+          "Menus" && (
           <MenusSection
             bots={bots}
             menus={menus}
-            filter={menuBotFilter}
-            setFilter={setMenuBotFilter}
-            onCreate={openCreateMenu}
-            onEdit={openEditMenu}
-            onToggle={toggleMenu}
+            selectedBot={
+              menuBotFilter
+            }
+            onBotChange={
+              setMenuBotFilter
+            }
+            onCreate={
+              openCreateMenu
+            }
+            onEdit={
+              openEditMenu
+            }
+            onToggle={
+              toggleMenu
+            }
           />
         )}
 
-        {activeSection === "Content" && (
+        {activeSection ===
+          "Content" && (
           <ContentSection
             bots={bots}
-            categories={categories}
-            content={visibleContent}
-            botFilter={contentBotFilter}
-            categoryFilter={contentCategoryFilter}
-            setBotFilter={setContentBotFilter}
-            setCategoryFilter={setContentCategoryFilter}
-            onCreate={openCreateContent}
-            onEdit={openEditContent}
-            onToggle={toggleContent}
+            categories={
+              categories
+            }
+            content={content}
+            botFilter={
+              contentBotFilter
+            }
+            categoryFilter={
+              contentCategoryFilter
+            }
+            onBotFilter={
+              setContentBotFilter
+            }
+            onCategoryFilter={
+              setContentCategoryFilter
+            }
+            onCreate={
+              openCreateContent
+            }
+            onEdit={
+              openEditContent
+            }
+            onToggle={
+              toggleContent
+            }
           />
         )}
 
-        {activeSection === "Users" && (
+        {activeSection ===
+          "Users" && (
           <UsersSection
-            users={visibleUsers}
+            users={users}
             bots={bots}
-            filter={userBotFilter}
-            setFilter={setUserBotFilter}
-          />
-        )}
+            selectedBot={
+              userBotFilter
+            }
+            onBotChange={
+              async (value) => {
+                setUserBotFilter(
+                  value
+                );
 
-        {activeSection === "Settings" && (
-          <SettingsSection
-            bots={bots}
-            telegramLoading={telegramLoading}
-            telegramMessage={telegramMessage}
-            telegramError={telegramError}
-            onSetupWebhook={setupTelegramWebhook}
+                try {
+                  const data =
+                    value
+                      ? await fetchApi(
+                          `/api/users?bot_id=${encodeURIComponent(
+                            value
+                          )}`
+                        )
+                      : await fetchApi(
+                          "/api/users"
+                        );
+
+                  setUsers(
+                    data || []
+                  );
+                } catch (
+                  error
+                ) {
+                  setApiError(
+                    error.message ||
+                      "Unable to load users."
+                  );
+                }
+              }
+            }
+            onToggle={
+              toggleUser
+            }
+            onRefresh={
+              reloadUsers
+            }
           />
         )}
 
@@ -1181,213 +1762,200 @@ function App() {
           "Monetization",
           "AI",
           "Admins",
-          "Activity Log"
-        ].includes(activeSection) && (
-          <ComingSoon section={activeSection} />
+          "Activity Log",
+          "Settings"
+        ].includes(
+          activeSection
+        ) && (
+          <ComingSoonSection
+            section={
+              activeSection
+            }
+          />
         )}
       </main>
 
       {botModal && (
         <BotModal
-          mode={botModal}
+          mode={
+            botModal === "create"
+              ? "create"
+              : "edit"
+          }
           form={botForm}
           saving={botSaving}
-          error={botError}
-          onChange={(key, value) =>
-            setBotForm((current) => ({
-              ...current,
-              [key]: value
-            }))
+          error={botFormError}
+          onChange={(
+            field,
+            value
+          ) =>
+            setBotForm(
+              (current) => ({
+                ...current,
+                [field]: value
+              })
+            )
           }
-          onClose={() => {
-            if (!botSaving) {
-              setBotModal(null);
-            }
-          }}
+          onClose={
+            closeBotModal
+          }
           onSubmit={saveBot}
         />
       )}
 
       {categoryModal && (
         <CategoryModal
-          mode={categoryModal}
-          form={categoryForm}
-          saving={categorySaving}
-          error={categoryError}
-          onChange={(key, value) =>
-            setCategoryForm((current) => ({
-              ...current,
-              [key]: value
-            }))
+          mode={
+            categoryModal ===
+            "create"
+              ? "create"
+              : "edit"
           }
-          onClose={() => {
-            if (!categorySaving) {
-              setCategoryModal(null);
-            }
-          }}
-          onSubmit={saveCategory}
+          form={categoryForm}
+          saving={
+            categorySaving
+          }
+          error={
+            categoryFormError
+          }
+          onChange={(
+            field,
+            value
+          ) =>
+            setCategoryForm(
+              (current) => ({
+                ...current,
+                [field]: value
+              })
+            )
+          }
+          onClose={
+            closeCategoryModal
+          }
+          onSubmit={
+            saveCategory
+          }
         />
       )}
 
       {menuModal && (
         <MenuModal
-          mode={menuModal}
+          mode={
+            menuModal === "create"
+              ? "create"
+              : "edit"
+          }
           form={menuForm}
           bots={bots}
           menus={menus}
           saving={menuSaving}
-          error={menuError}
-          onChange={(key, value) =>
-            setMenuForm((current) => ({
-              ...current,
-              [key]: value
-            }))
+          error={menuFormError}
+          onChange={(
+            field,
+            value
+          ) =>
+            setMenuForm(
+              (current) => ({
+                ...current,
+                [field]: value
+              })
+            )
           }
-          onClose={() => {
-            if (!menuSaving) {
-              setMenuModal(null);
-            }
-          }}
+          onClose={
+            closeMenuModal
+          }
           onSubmit={saveMenu}
         />
       )}
 
       {contentModal && (
         <ContentModal
-          mode={contentModal}
+          mode={
+            contentModal ===
+            "create"
+              ? "create"
+              : "edit"
+          }
           form={contentForm}
           bots={bots}
-          categories={categories}
-          saving={contentSaving}
-          error={contentError}
-          onChange={(key, value) =>
-            setContentForm((current) => ({
-              ...current,
-              [key]: value
-            }))
+          categories={
+            categories
           }
-          onClose={() => {
-            if (!contentSaving) {
-              setContentModal(null);
-            }
-          }}
-          onSubmit={saveContent}
+          saving={
+            contentSaving
+          }
+          error={
+            contentFormError
+          }
+          onChange={(
+            field,
+            value
+          ) =>
+            setContentForm(
+              (current) => ({
+                ...current,
+                [field]: value
+              })
+            )
+          }
+          onClose={
+            closeContentModal
+          }
+          onSubmit={
+            saveContent
+          }
         />
       )}
     </div>
   );
 }
 
-/* =========================
-   LOGIN
-========================= */
+function getSectionDescription(
+  section
+) {
+  const descriptions = {
+    Overview:
+      "FINDLY control center",
+    Bots:
+      "Create and manage FINDLY bots",
+    Categories:
+      "Manage global content categories",
+    Menus:
+      "Build bot navigation menus",
+    Content:
+      "Manage published and unpublished content",
+    Users:
+      "Manage Telegram users",
+    Notifications:
+      "Notification management",
+    Analytics:
+      "Usage and performance analytics",
+    Monetization:
+      "Revenue and monetization",
+    AI:
+      "AI configuration",
+    Admins:
+      "Administrators and permissions",
+    "Activity Log":
+      "System activity history",
+    Settings:
+      "FINDLY system settings"
+  };
 
-function LoginPage({
-  email,
-  password,
-  resetMode,
-  loading,
-  error,
-  message,
-  onEmail,
-  onPassword,
-  onLogin,
-  onReset,
-  onToggleReset
-}) {
   return (
-    <div className="auth-page">
-      <div className="auth-card">
-        <h1>FINDLY</h1>
-
-        <p>
-          Master Admin Dashboard
-        </p>
-
-        <form
-          className="auth-form"
-          onSubmit={
-            resetMode ? onReset : onLogin
-          }
-        >
-          <div className="auth-field">
-            <label>Email</label>
-
-            <input
-              type="email"
-              value={email}
-              onChange={(e) =>
-                onEmail(e.target.value)
-              }
-              autoComplete="email"
-              required
-            />
-          </div>
-
-          {!resetMode && (
-            <div className="auth-field">
-              <label>Password</label>
-
-              <input
-                type="password"
-                value={password}
-                onChange={(e) =>
-                  onPassword(e.target.value)
-                }
-                autoComplete="current-password"
-                required
-              />
-            </div>
-          )}
-
-          {error && (
-            <div className="auth-error">
-              {error}
-            </div>
-          )}
-
-          {message && (
-            <div className="auth-success">
-              {message}
-            </div>
-          )}
-
-          <button
-            className="auth-button"
-            disabled={loading}
-          >
-            {loading
-              ? "Please wait..."
-              : resetMode
-              ? "Send reset email"
-              : "Sign in"}
-          </button>
-
-          <button
-            type="button"
-            className="auth-link"
-            onClick={onToggleReset}
-          >
-            {resetMode
-              ? "Back to sign in"
-              : "Forgot password?"}
-          </button>
-        </form>
-      </div>
-    </div>
+    descriptions[section] ||
+    "FINDLY control center"
   );
 }
-
-/* =========================
-   OVERVIEW
-========================= */
 
 function Overview({
   bots,
   categories,
   users,
   content,
-  activeBots
+  activeBots,
+  activeCategories,
+  activeContent
 }) {
   return (
     <>
@@ -1399,9 +1967,17 @@ function Overview({
         />
 
         <StatCard
-          icon="🟢"
-          label="Active Bots"
-          value={activeBots}
+          icon="🗂️"
+          label="Active Categories"
+          value={
+            activeCategories
+          }
+        />
+
+        <StatCard
+          icon="🗃️"
+          label="Active Content"
+          value={activeContent}
         />
 
         <StatCard
@@ -1409,38 +1985,35 @@ function Overview({
           label="Telegram Users"
           value={users.length}
         />
-
-        <StatCard
-          icon="🗃️"
-          label="Content Items"
-          value={content.length}
-        />
       </div>
 
       <div className="grid">
         <section className="panel">
           <div className="panel-header">
             <div>
-              <h2>Bots Network</h2>
+              <h2>
+                FINDLY Bots
+              </h2>
               <p>
-                Master and child FINDLY bots
+                Current bot network
               </p>
             </div>
           </div>
 
-          {bots.length === 0 ? (
-            <div className="empty">
-              No bots found.
-            </div>
-          ) : (
-            <div className="bot-list">
-              {bots.map((bot) => (
+          <div className="bot-list">
+            {bots.length === 0 ? (
+              <div className="empty">
+                No bots found.
+              </div>
+            ) : (
+              bots.map((bot) => (
                 <div
                   className="bot-row"
                   key={bot.id}
                 >
                   <div className="bot-icon">
-                    {bot.icon || "🤖"}
+                    {bot.icon ||
+                      "🤖"}
                   </div>
 
                   <div className="bot-info">
@@ -1449,84 +2022,95 @@ function Overview({
                     </strong>
 
                     <span>
-                      {bot.telegram_username ||
-                        bot.slug}
+                      {bot.slug}
                     </span>
                   </div>
 
-                  <StatusBadge
-                    active={bot.is_active}
+                  <BotStatus
+                    bot={bot}
                   />
                 </div>
-              ))}
-            </div>
-          )}
+              ))
+            )}
+          </div>
         </section>
 
         <section className="panel">
           <div className="panel-header">
             <div>
-              <h2>Categories</h2>
+              <h2>
+                Categories
+              </h2>
               <p>
-                Global FINDLY categories
+                Global content structure
               </p>
             </div>
           </div>
 
-          {categories.length === 0 ? (
-            <div className="empty">
-              No categories found.
-            </div>
-          ) : (
-            <div className="category-list">
-              {categories
-                .slice(0, 8)
-                .map((category) => (
+          <div className="category-list">
+            {categories
+              .slice(0, 8)
+              .map(
+                (category) => (
                   <div
                     className="category-row"
-                    key={category.id}
+                    key={
+                      category.id
+                    }
                   >
                     <div className="category-icon">
-                      {category.icon || "📁"}
+                      {category.icon ||
+                        "📁"}
                     </div>
 
                     <div>
                       <strong>
-                        {category.name}
+                        {
+                          category.name
+                        }
                       </strong>
 
                       <small>
-                        {category.slug}
+                        {
+                          category.slug
+                        }
                       </small>
                     </div>
 
-                    {category.is_active ? (
-                      <span className="active-label">
-                        Active
-                      </span>
-                    ) : (
-                      <span className="inactive-label">
-                        Paused
-                      </span>
-                    )}
+                    <span
+                      className={
+                        category.is_active
+                          ? "active-label"
+                          : "inactive-label"
+                      }
+                    >
+                      {category.is_active
+                        ? "Active"
+                        : "Paused"}
+                    </span>
                   </div>
-                ))}
-            </div>
-          )}
+                )
+              )}
+
+            {categories.length ===
+              0 && (
+              <div className="empty">
+                No categories found.
+              </div>
+            )}
+          </div>
         </section>
       </div>
 
       <SystemPanel
         bots={bots}
-        activeBots={activeBots}
+        activeBots={
+          activeBots
+        }
       />
     </>
   );
 }
-
-/* =========================
-   BOTS
-========================= */
 
 function BotsSection({
   bots,
@@ -1536,12 +2120,29 @@ function BotsSection({
 }) {
   return (
     <>
-      <ManagementToolbar
-        title="Bots Management"
-        description="Manage the FINDLY master and child bot network."
-        actionLabel="+ Add Bot"
-        onAction={onCreate}
-      />
+      <div className="management-toolbar">
+        <div>
+          <strong>
+            Bots Management
+          </strong>
+
+          <span>
+            {bots.length} bot
+            {bots.length === 1
+              ? ""
+              : "s"}{" "}
+            configured
+          </span>
+        </div>
+
+        <button
+          className="primary-button"
+          type="button"
+          onClick={onCreate}
+        >
+          + Add Bot
+        </button>
+      </div>
 
       <section className="panel">
         <div className="table-wrap">
@@ -1549,9 +2150,11 @@ function BotsSection({
             <thead>
               <tr>
                 <th>Bot</th>
+                <th>Slug</th>
                 <th>Type</th>
                 <th>Telegram</th>
                 <th>Status</th>
+                <th>Order</th>
                 <th>Actions</th>
               </tr>
             </thead>
@@ -1561,9 +2164,10 @@ function BotsSection({
                 <tr key={bot.id}>
                   <td>
                     <div className="table-entity">
-                      <div className="table-icon">
-                        {bot.icon || "🤖"}
-                      </div>
+                      <span className="table-icon">
+                        {bot.icon ||
+                          "🤖"}
+                      </span>
 
                       <div>
                         <strong>
@@ -1571,15 +2175,24 @@ function BotsSection({
                         </strong>
 
                         <small>
-                          {bot.slug}
+                          {bot.description ||
+                            "No description"}
                         </small>
                       </div>
                     </div>
                   </td>
 
                   <td>
+                    <code>
+                      {bot.slug}
+                    </code>
+                  </td>
+
+                  <td>
                     <span className="type-badge">
-                      {bot.bot_type}
+                      {
+                        bot.bot_type
+                      }
                     </span>
                   </td>
 
@@ -1589,17 +2202,24 @@ function BotsSection({
                   </td>
 
                   <td>
-                    <StatusBadge
-                      active={bot.is_active}
+                    <BotStatus
+                      bot={bot}
                     />
+                  </td>
+
+                  <td>
+                    {bot.sort_order}
                   </td>
 
                   <td>
                     <div className="row-actions">
                       <button
                         className="table-button"
+                        type="button"
                         onClick={() =>
-                          onEdit(bot)
+                          onEdit(
+                            bot
+                          )
                         }
                       >
                         Edit
@@ -1607,8 +2227,11 @@ function BotsSection({
 
                       <button
                         className="table-button"
+                        type="button"
                         onClick={() =>
-                          onToggle(bot)
+                          onToggle(
+                            bot
+                          )
                         }
                       >
                         {bot.is_active
@@ -1619,27 +2242,19 @@ function BotsSection({
                   </td>
                 </tr>
               ))}
-
-              {bots.length === 0 && (
-                <tr>
-                  <td colSpan="5">
-                    <div className="empty">
-                      No bots found.
-                    </div>
-                  </td>
-                </tr>
-              )}
             </tbody>
           </table>
+
+          {bots.length === 0 && (
+            <div className="empty">
+              No bots found.
+            </div>
+          )}
         </div>
       </section>
     </>
   );
 }
-
-/* =========================
-   CATEGORIES
-========================= */
 
 function CategoriesSection({
   categories,
@@ -1649,12 +2264,26 @@ function CategoriesSection({
 }) {
   return (
     <>
-      <ManagementToolbar
-        title="Categories"
-        description="Manage global FINDLY categories."
-        actionLabel="+ Add Category"
-        onAction={onCreate}
-      />
+      <div className="management-toolbar">
+        <div>
+          <strong>
+            Categories Management
+          </strong>
+
+          <span>
+            Global categories used
+            by FINDLY content.
+          </span>
+        </div>
+
+        <button
+          className="primary-button"
+          type="button"
+          onClick={onCreate}
+        >
+          + Add Category
+        </button>
+      </div>
 
       <section className="panel">
         <div className="table-wrap">
@@ -1663,153 +2292,186 @@ function CategoriesSection({
               <tr>
                 <th>Category</th>
                 <th>Slug</th>
-                <th>Order</th>
+                <th>Description</th>
                 <th>Status</th>
+                <th>Order</th>
                 <th>Actions</th>
               </tr>
             </thead>
 
             <tbody>
-              {categories.map((category) => (
-                <tr key={category.id}>
-                  <td>
-                    <div className="table-entity">
-                      <div className="table-icon">
-                        {category.icon || "📁"}
-                      </div>
+              {categories.map(
+                (category) => (
+                  <tr
+                    key={
+                      category.id
+                    }
+                  >
+                    <td>
+                      <div className="table-entity">
+                        <span className="table-icon">
+                          {category.icon ||
+                            "📁"}
+                        </span>
 
-                      <div>
                         <strong>
-                          {category.name}
+                          {
+                            category.name
+                          }
                         </strong>
-
-                        <small>
-                          {category.description ||
-                            "—"}
-                        </small>
                       </div>
-                    </div>
-                  </td>
+                    </td>
 
-                  <td>
-                    <code>
-                      {category.slug}
-                    </code>
-                  </td>
+                    <td>
+                      <code>
+                        {
+                          category.slug
+                        }
+                      </code>
+                    </td>
 
-                  <td>
-                    {category.sort_order}
-                  </td>
-
-                  <td>
-                    <StatusBadge
-                      active={
-                        category.is_active
+                    <td>
+                      {
+                        category.description ||
+                        "—"
                       }
-                    />
-                  </td>
+                    </td>
 
-                  <td>
-                    <div className="row-actions">
-                      <button
-                        className="table-button"
-                        onClick={() =>
-                          onEdit(category)
+                    <td>
+                      <StatusBadge
+                        active={
+                          category.is_active
                         }
-                      >
-                        Edit
-                      </button>
+                      />
+                    </td>
 
-                      <button
-                        className="table-button"
-                        onClick={() =>
-                          onToggle(category)
-                        }
-                      >
-                        {category.is_active
-                          ? "Pause"
-                          : "Activate"}
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
+                    <td>
+                      {
+                        category.sort_order
+                      }
+                    </td>
 
-              {categories.length === 0 && (
-                <tr>
-                  <td colSpan="5">
-                    <div className="empty">
-                      No categories found.
-                    </div>
-                  </td>
-                </tr>
+                    <td>
+                      <div className="row-actions">
+                        <button
+                          className="table-button"
+                          type="button"
+                          onClick={() =>
+                            onEdit(
+                              category
+                            )
+                          }
+                        >
+                          Edit
+                        </button>
+
+                        <button
+                          className="table-button"
+                          type="button"
+                          onClick={() =>
+                            onToggle(
+                              category
+                            )
+                          }
+                        >
+                          {category.is_active
+                            ? "Pause"
+                            : "Activate"}
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                )
               )}
             </tbody>
           </table>
+
+          {categories.length ===
+            0 && (
+            <div className="empty">
+              No categories found.
+            </div>
+          )}
         </div>
       </section>
     </>
   );
 }
 
-/* =========================
-   MENUS
-========================= */
-
 function MenusSection({
   bots,
   menus,
-  filter,
-  setFilter,
+  selectedBot,
+  onBotChange,
   onCreate,
   onEdit,
   onToggle
 }) {
   return (
     <>
-      <ManagementToolbar
-        title="Menu Builder"
-        description="Control Telegram navigation dynamically."
-        actionLabel="+ Add Menu Item"
-        onAction={onCreate}
-      >
-        <select
-          className="toolbar-select"
-          value={filter}
-          onChange={(e) =>
-            setFilter(e.target.value)
-          }
-        >
-          <option value="">
-            Select bot
-          </option>
+      <div className="management-toolbar">
+        <div>
+          <strong>
+            Menu Builder
+          </strong>
 
-          {bots.map((bot) => (
-            <option
-              key={bot.id}
-              value={bot.id}
-            >
-              {bot.name}
+          <span>
+            Select a bot to manage
+            its menu items.
+          </span>
+        </div>
+
+        <div className="toolbar-actions">
+          <select
+            className="toolbar-select"
+            value={selectedBot}
+            onChange={(event) =>
+              onBotChange(
+                event.target.value
+              )
+            }
+          >
+            <option value="">
+              Select bot
             </option>
-          ))}
-        </select>
-      </ManagementToolbar>
+
+            {bots.map((bot) => (
+              <option
+                key={bot.id}
+                value={bot.id}
+              >
+                {bot.icon || "🤖"}{" "}
+                {bot.name}
+              </option>
+            ))}
+          </select>
+
+          <button
+            className="primary-button"
+            type="button"
+            onClick={onCreate}
+            disabled={!selectedBot}
+          >
+            + Add Menu Item
+          </button>
+        </div>
+      </div>
 
       <section className="panel">
-        {!filter ? (
+        {!selectedBot ? (
           <div className="empty large-empty">
-            Select a bot to manage its menu.
+            Select a bot first.
           </div>
         ) : (
           <div className="table-wrap">
             <table className="data-table">
               <thead>
                 <tr>
-                  <th>Menu Item</th>
+                  <th>Menu</th>
                   <th>Action</th>
                   <th>Value</th>
-                  <th>Order</th>
                   <th>Status</th>
+                  <th>Order</th>
                   <th>Actions</th>
                 </tr>
               </thead>
@@ -1818,23 +2480,279 @@ function MenusSection({
                 {menus.map((item) => (
                   <tr key={item.id}>
                     <td>
-                      {item.icon || "🔘"}{" "}
-                      {item.label}
+                      <div className="table-entity">
+                        <span className="table-icon">
+                          {item.icon ||
+                            "🔘"}
+                        </span>
+
+                        <div>
+                          <strong>
+                            {item.label}
+                          </strong>
+
+                          {item.parent_id && (
+                            <small>
+                              Child item
+                            </small>
+                          )}
+                        </div>
+                      </div>
                     </td>
 
                     <td>
                       <span className="type-badge">
-                        {item.action_type}
+                        {
+                          item.action_type
+                        }
                       </span>
                     </td>
 
                     <td>
-                      {item.action_value ||
-                        "—"}
+                      {
+                        item.action_value ||
+                        "—"
+                      }
                     </td>
 
                     <td>
-                      {item.sort_order}
+                      <StatusBadge
+                        active={
+                          item.is_active
+                        }
+                      />
+                    </td>
+
+                    <td>
+                      {
+                        item.sort_order
+                      }
+                    </td>
+
+                    <td>
+                      <div className="row-actions">
+                        <button
+                          className="table-button"
+                          type="button"
+                          onClick={() =>
+                            onEdit(
+                              item
+                            )
+                          }
+                        >
+                          Edit
+                        </button>
+
+                        <button
+                          className="table-button"
+                          type="button"
+                          onClick={() =>
+                            onToggle(
+                              item
+                            )
+                          }
+                        >
+                          {item.is_active
+                            ? "Pause"
+                            : "Activate"}
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+
+            {menus.length === 0 && (
+              <div className="empty">
+                No menu items found
+                for this bot.
+              </div>
+            )}
+          </div>
+        )}
+      </section>
+    </>
+  );
+}
+
+function ContentSection({
+  bots,
+  categories,
+  content,
+  botFilter,
+  categoryFilter,
+  onBotFilter,
+  onCategoryFilter,
+  onCreate,
+  onEdit,
+  onToggle
+}) {
+  const filteredContent =
+    content.filter((item) => {
+      if (
+        botFilter &&
+        item.bot_id !== botFilter
+      ) {
+        return false;
+      }
+
+      if (
+        categoryFilter &&
+        item.category_id !==
+          categoryFilter
+      ) {
+        return false;
+      }
+
+      return true;
+    });
+
+  return (
+    <>
+      <div className="management-toolbar">
+        <div>
+          <strong>
+            Content Management
+          </strong>
+
+          <span>
+            {filteredContent.length}{" "}
+            visible item
+            {filteredContent.length ===
+            1
+              ? ""
+              : "s"}
+          </span>
+        </div>
+
+        <div className="toolbar-actions">
+          <select
+            className="toolbar-select"
+            value={botFilter}
+            onChange={(event) =>
+              onBotFilter(
+                event.target.value
+              )
+            }
+          >
+            <option value="">
+              All bots
+            </option>
+
+            {bots.map((bot) => (
+              <option
+                key={bot.id}
+                value={bot.id}
+              >
+                {bot.name}
+              </option>
+            ))}
+          </select>
+
+          <select
+            className="toolbar-select"
+            value={categoryFilter}
+            onChange={(event) =>
+              onCategoryFilter(
+                event.target.value
+              )
+            }
+          >
+            <option value="">
+              All categories
+            </option>
+
+            {categories.map(
+              (category) => (
+                <option
+                  key={category.id}
+                  value={
+                    category.id
+                  }
+                >
+                  {category.name}
+                </option>
+              )
+            )}
+          </select>
+
+          <button
+            className="primary-button"
+            type="button"
+            onClick={onCreate}
+          >
+            + Add Content
+          </button>
+        </div>
+      </div>
+
+      <section className="panel">
+        <div className="table-wrap">
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>Content</th>
+                <th>Bot</th>
+                <th>Category</th>
+                <th>Type</th>
+                <th>Published</th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+
+            <tbody>
+              {filteredContent.map(
+                (item) => (
+                  <tr key={item.id}>
+                    <td>
+                      <div className="content-title">
+                        <strong>
+                          {item.title}
+                        </strong>
+
+                        <small>
+                          {
+                            item.description ||
+                            "No description"
+                          }
+                        </small>
+                      </div>
+                    </td>
+
+                    <td>
+                      {
+                        bots.find(
+                          (bot) =>
+                            bot.id ===
+                            item.bot_id
+                        )?.name ||
+                        "Unknown"
+                      }
+                    </td>
+
+                    <td>
+                      {getCategoryNameLocal(
+                        categories,
+                        item.category_id
+                      )}
+                    </td>
+
+                    <td>
+                      <span className="type-badge">
+                        {
+                          item.content_type
+                        }
+                      </span>
+                    </td>
+
+                    <td>
+                      {item.published_at
+                        ? formatDate(
+                            item.published_at
+                          )
+                        : "Draft"}
                     </td>
 
                     <td>
@@ -1849,8 +2767,11 @@ function MenusSection({
                       <div className="row-actions">
                         <button
                           className="table-button"
+                          type="button"
                           onClick={() =>
-                            onEdit(item)
+                            onEdit(
+                              item
+                            )
                           }
                         >
                           Edit
@@ -1858,256 +2779,107 @@ function MenusSection({
 
                         <button
                           className="table-button"
+                          type="button"
                           onClick={() =>
-                            onToggle(item)
+                            onToggle(
+                              item
+                            )
                           }
                         >
                           {item.is_active
-                            ? "Pause"
+                            ? "Deactivate"
                             : "Activate"}
                         </button>
                       </div>
                     </td>
                   </tr>
-                ))}
-
-                {menus.length === 0 && (
-                  <tr>
-                    <td colSpan="6">
-                      <div className="empty">
-                        No menu items found.
-                      </div>
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </section>
-    </>
-  );
-}
-
-/* =========================
-   CONTENT
-========================= */
-
-function ContentSection({
-  bots,
-  categories,
-  content,
-  botFilter,
-  categoryFilter,
-  setBotFilter,
-  setCategoryFilter,
-  onCreate,
-  onEdit,
-  onToggle
-}) {
-  return (
-    <>
-      <ManagementToolbar
-        title="Content"
-        description="Manage content served by FINDLY bots."
-        actionLabel="+ Add Content"
-        onAction={onCreate}
-      >
-        <select
-          className="toolbar-select"
-          value={botFilter}
-          onChange={(e) =>
-            setBotFilter(e.target.value)
-          }
-        >
-          <option value="">
-            All bots
-          </option>
-
-          {bots.map((bot) => (
-            <option
-              key={bot.id}
-              value={bot.id}
-            >
-              {bot.name}
-            </option>
-          ))}
-        </select>
-
-        <select
-          className="toolbar-select"
-          value={categoryFilter}
-          onChange={(e) =>
-            setCategoryFilter(
-              e.target.value
-            )
-          }
-        >
-          <option value="">
-            All categories
-          </option>
-
-          {categories.map((category) => (
-            <option
-              key={category.id}
-              value={category.id}
-            >
-              {category.name}
-            </option>
-          ))}
-        </select>
-      </ManagementToolbar>
-
-      <section className="panel">
-        <div className="table-wrap">
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>Content</th>
-                <th>Bot</th>
-                <th>Category</th>
-                <th>Type</th>
-                <th>Status</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-
-            <tbody>
-              {content.map((item) => (
-                <tr key={item.id}>
-                  <td>
-                    <div className="content-title">
-                      <strong>
-                        {item.title}
-                      </strong>
-
-                      <small>
-                        {item.description ||
-                          "—"}
-                      </small>
-                    </div>
-                  </td>
-
-                  <td>
-                    {bots.find(
-                      (bot) =>
-                        bot.id === item.bot_id
-                    )?.name || "—"}
-                  </td>
-
-                  <td>
-                    {categories.find(
-                      (category) =>
-                        category.id ===
-                        item.category_id
-                    )?.name || "—"}
-                  </td>
-
-                  <td>
-                    <span className="type-badge">
-                      {item.content_type}
-                    </span>
-                  </td>
-
-                  <td>
-                    <StatusBadge
-                      active={
-                        item.is_active
-                      }
-                    />
-                  </td>
-
-                  <td>
-                    <div className="row-actions">
-                      <button
-                        className="table-button"
-                        onClick={() =>
-                          onEdit(item)
-                        }
-                      >
-                        Edit
-                      </button>
-
-                      <button
-                        className="table-button"
-                        onClick={() =>
-                          onToggle(item)
-                        }
-                      >
-                        {item.is_active
-                          ? "Pause"
-                          : "Activate"}
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-
-              {content.length === 0 && (
-                <tr>
-                  <td colSpan="6">
-                    <div className="empty">
-                      No content found.
-                    </div>
-                  </td>
-                </tr>
+                )
               )}
             </tbody>
           </table>
+
+          {filteredContent.length ===
+            0 && (
+            <div className="empty">
+              No content found.
+            </div>
+          )}
         </div>
       </section>
     </>
   );
 }
 
-/* =========================
-   USERS
-========================= */
-
 function UsersSection({
   users,
   bots,
-  filter,
-  setFilter
+  selectedBot,
+  onBotChange,
+  onToggle,
+  onRefresh
 }) {
   return (
     <>
-      <ManagementToolbar
-        title="Telegram Users"
-        description="Users registered through FINDLY Telegram bots."
-      >
-        <select
-          className="toolbar-select"
-          value={filter}
-          onChange={(e) =>
-            setFilter(e.target.value)
-          }
-        >
-          <option value="">
-            All bots
-          </option>
+      <div className="management-toolbar">
+        <div>
+          <strong>
+            Telegram Users
+          </strong>
 
-          {bots.map((bot) => (
-            <option
-              key={bot.id}
-              value={bot.id}
-            >
-              {bot.name}
+          <span>
+            {users.length} user
+            {users.length === 1
+              ? ""
+              : "s"} loaded
+          </span>
+        </div>
+
+        <div className="toolbar-actions">
+          <select
+            className="toolbar-select"
+            value={selectedBot}
+            onChange={(event) =>
+              onBotChange(
+                event.target.value
+              )
+            }
+          >
+            <option value="">
+              All bots
             </option>
-          ))}
-        </select>
-      </ManagementToolbar>
+
+            {bots.map((bot) => (
+              <option
+                key={bot.id}
+                value={bot.id}
+              >
+                {bot.name}
+              </option>
+            ))}
+          </select>
+
+          <button
+            className="secondary-button"
+            type="button"
+            onClick={onRefresh}
+          >
+            Refresh
+          </button>
+        </div>
+      </div>
 
       <section className="panel">
         <div className="table-wrap">
           <table className="data-table">
             <thead>
               <tr>
-                <th>User</th>
                 <th>Telegram ID</th>
+                <th>User</th>
                 <th>Language</th>
+                <th>First Seen</th>
                 <th>Last Seen</th>
                 <th>Status</th>
+                <th>Action</th>
               </tr>
             </thead>
 
@@ -2115,28 +2887,49 @@ function UsersSection({
               {users.map((user) => (
                 <tr key={user.id}>
                   <td>
+                    <code>
+                      {
+                        user.telegram_user_id
+                      }
+                    </code>
+                  </td>
+
+                  <td>
                     <div className="content-title">
                       <strong>
-                        {user.first_name ||
-                          user.username ||
-                          "Telegram User"}
+                        {user.username
+                          ? `@${user.username}`
+                          : [
+                              user.first_name,
+                              user.last_name
+                            ]
+                              .filter(
+                                Boolean
+                              )
+                              .join(
+                                " "
+                              ) ||
+                            "Unknown user"}
                       </strong>
 
                       <small>
-                        {user.username
-                          ? `@${user.username}`
-                          : "—"}
+                        {user.first_name ||
+                          "No first name"}
                       </small>
                     </div>
                   </td>
 
                   <td>
-                    {user.telegram_user_id}
+                    {
+                      user.language_code ||
+                      "—"
+                    }
                   </td>
 
                   <td>
-                    {user.language_code ||
-                      "—"}
+                    {formatDate(
+                      user.first_seen_at
+                    )}
                   </td>
 
                   <td>
@@ -2152,154 +2945,37 @@ function UsersSection({
                       }
                     />
                   </td>
-                </tr>
-              ))}
 
-              {users.length === 0 && (
-                <tr>
-                  <td colSpan="5">
-                    <div className="empty">
-                      No users found.
-                    </div>
+                  <td>
+                    <button
+                      className="table-button"
+                      type="button"
+                      onClick={() =>
+                        onToggle(
+                          user
+                        )
+                      }
+                    >
+                      {user.is_active
+                        ? "Deactivate"
+                        : "Activate"}
+                    </button>
                   </td>
                 </tr>
-              )}
+              ))}
             </tbody>
           </table>
+
+          {users.length === 0 && (
+            <div className="empty">
+              No users found.
+            </div>
+          )}
         </div>
       </section>
     </>
   );
 }
-
-/* =========================
-   SETTINGS / TELEGRAM
-========================= */
-
-function SettingsSection({
-  bots,
-  telegramLoading,
-  telegramMessage,
-  telegramError,
-  onSetupWebhook
-}) {
-  const master =
-    bots.find(
-      (bot) => bot.bot_type === "master"
-    ) ||
-    bots.find(
-      (bot) => bot.slug === "findly"
-    );
-
-  return (
-    <>
-      <section className="panel system-panel">
-        <div className="panel-header">
-          <div>
-            <h2>Telegram Integration</h2>
-            <p>
-              Connect the existing FINDLY master
-              Telegram bot to the Cloudflare Worker.
-            </p>
-          </div>
-        </div>
-
-        <div className="system-grid">
-          <SystemItem
-            label="Master Bot"
-            value={
-              master?.telegram_username ||
-              master?.slug ||
-              "Not configured"
-            }
-          />
-
-          <SystemItem
-            label="Backend"
-            value="Cloudflare Worker"
-          />
-
-          <SystemItem
-            label="Webhook"
-            value={
-              telegramMessage
-                ? "Connected"
-                : "Ready"
-            }
-          />
-
-          <SystemItem
-            label="Token"
-            value="Server secret"
-          />
-        </div>
-
-        <div
-          style={{
-            marginTop: "18px"
-          }}
-        >
-          <button
-            className="primary-button"
-            onClick={onSetupWebhook}
-            disabled={
-              telegramLoading || !master
-            }
-          >
-            {telegramLoading
-              ? "Connecting..."
-              : "Connect Telegram Webhook"}
-          </button>
-        </div>
-
-        {telegramMessage && (
-          <div
-            className="auth-success"
-            style={{
-              marginTop: "15px"
-            }}
-          >
-            {telegramMessage}
-          </div>
-        )}
-
-        {telegramError && (
-          <div
-            className="auth-error"
-            style={{
-              marginTop: "15px"
-            }}
-          >
-            {telegramError}
-          </div>
-        )}
-      </section>
-
-      <section className="panel">
-        <div className="panel-header">
-          <div>
-            <h2>Architecture</h2>
-            <p>
-              Telegram credentials remain server-side.
-            </p>
-          </div>
-        </div>
-
-        <div className="empty">
-          Dashboard → Cloudflare API → Telegram
-          <br />
-          Telegram token → Cloudflare Secret
-          <br />
-          Webhook secret → Cloudflare Secret
-        </div>
-      </section>
-    </>
-  );
-}
-
-/* =========================
-   MODALS
-========================= */
 
 function BotModal({
   mode,
@@ -2317,7 +2993,11 @@ function BotModal({
           ? "Create Bot"
           : "Edit Bot"
       }
-      subtitle="Configure a FINDLY bot."
+      subtitle={
+        mode === "create"
+          ? "Add a new FINDLY bot."
+          : "Update this bot configuration."
+      }
       onClose={onClose}
     >
       <form
@@ -2328,27 +3008,39 @@ function BotModal({
           <FormField
             label="Name"
             value={form.name}
-            onChange={(v) =>
-              onChange("name", v)
+            onChange={(value) =>
+              onChange(
+                "name",
+                value
+              )
             }
+            placeholder="FINDLY Movies"
             required
           />
 
           <FormField
             label="Slug"
             value={form.slug}
-            onChange={(v) =>
-              onChange("slug", v)
+            onChange={(value) =>
+              onChange(
+                "slug",
+                value
+              )
             }
+            placeholder="movies"
             required
           />
 
           <FormField
             label="Bot Type"
             value={form.bot_type}
-            onChange={(v) =>
-              onChange("bot_type", v)
+            onChange={(value) =>
+              onChange(
+                "bot_type",
+                value
+              )
             }
+            placeholder="child"
             required
           />
 
@@ -2357,54 +3049,64 @@ function BotModal({
             value={
               form.telegram_username
             }
-            onChange={(v) =>
+            onChange={(value) =>
               onChange(
                 "telegram_username",
-                v
+                value
               )
             }
-            placeholder="@FindlySearch2026Bot"
+            placeholder="@FindlyMoviesBot"
           />
 
           <FormField
             label="Icon"
             value={form.icon}
-            onChange={(v) =>
-              onChange("icon", v)
+            onChange={(value) =>
+              onChange(
+                "icon",
+                value
+              )
             }
+            placeholder="🎬"
           />
 
           <FormField
             label="Sort Order"
             type="number"
             value={form.sort_order}
-            onChange={(v) =>
+            onChange={(value) =>
               onChange(
                 "sort_order",
-                v
+                value
               )
             }
+            placeholder="0"
           />
         </div>
 
         <FormField
           label="Description"
-          value={form.description}
-          onChange={(v) =>
+          value={
+            form.description
+          }
+          onChange={(value) =>
             onChange(
               "description",
-              v
+              value
             )
           }
+          placeholder="What this bot does..."
           textarea
         />
 
         <CheckboxField
-          checked={form.is_active}
-          onChange={(v) =>
+          checked={
+            form.is_active
+          }
+          onChange={(value) =>
             onChange(
               "is_active",
-              v
+              value
             )
           }
           label="Bot is active"
@@ -2419,7 +3121,7 @@ function BotModal({
         <ModalActions
           saving={saving}
           onClose={onClose}
-          label={
+          submitLabel={
             mode === "create"
               ? "Create Bot"
               : "Save Changes"
@@ -2446,7 +3148,7 @@ function CategoryModal({
           ? "Create Category"
           : "Edit Category"
       }
-      subtitle="Manage a FINDLY category."
+      subtitle="Manage a global FINDLY category."
       onClose={onClose}
     >
       <form
@@ -2457,60 +3159,78 @@ function CategoryModal({
           <FormField
             label="Name"
             value={form.name}
-            onChange={(v) =>
-              onChange("name", v)
+            onChange={(value) =>
+              onChange(
+                "name",
+                value
+              )
             }
+            placeholder="Movies"
             required
           />
 
           <FormField
             label="Slug"
             value={form.slug}
-            onChange={(v) =>
-              onChange("slug", v)
+            onChange={(value) =>
+              onChange(
+                "slug",
+                value
+              )
             }
+            placeholder="movies"
             required
           />
 
           <FormField
             label="Icon"
             value={form.icon}
-            onChange={(v) =>
-              onChange("icon", v)
+            onChange={(value) =>
+              onChange(
+                "icon",
+                value
+              )
             }
+            placeholder="🎬"
           />
 
           <FormField
             label="Sort Order"
             type="number"
             value={form.sort_order}
-            onChange={(v) =>
+            onChange={(value) =>
               onChange(
                 "sort_order",
-                v
+                value
               )
             }
+            placeholder="0"
           />
         </div>
 
         <FormField
           label="Description"
-          value={form.description}
-          onChange={(v) =>
+          value={
+            form.description
+          }
+          onChange={(value) =>
             onChange(
               "description",
-              v
+              value
             )
           }
+          placeholder="Category description..."
           textarea
         />
 
         <CheckboxField
-          checked={form.is_active}
-          onChange={(v) =>
+          checked={
+            form.is_active
+          }
+          onChange={(value) =>
             onChange(
               "is_active",
-              v
+              value
             )
           }
           label="Category is active"
@@ -2525,7 +3245,7 @@ function CategoryModal({
         <ModalActions
           saving={saving}
           onClose={onClose}
-          label={
+          submitLabel={
             mode === "create"
               ? "Create Category"
               : "Save Changes"
@@ -2547,12 +3267,15 @@ function MenuModal({
   onClose,
   onSubmit
 }) {
-  const parents = menus.filter(
-    (item) =>
-      item.id !== mode?.id &&
-      item.bot_id === form.bot_id &&
-      !item.parent_id
-  );
+  const parentOptions =
+    menus.filter(
+      (item) =>
+        item.id !==
+        form.id &&
+        item.bot_id ===
+          form.bot_id &&
+        !item.parent_id
+    );
 
   return (
     <Modal
@@ -2561,7 +3284,7 @@ function MenuModal({
           ? "Create Menu Item"
           : "Edit Menu Item"
       }
-      subtitle="Build Telegram navigation."
+      subtitle="Build the Telegram bot navigation."
       onClose={onClose}
     >
       <form
@@ -2569,23 +3292,44 @@ function MenuModal({
         onSubmit={onSubmit}
       >
         <div className="form-grid">
-          <SelectField
-            label="Bot"
-            value={form.bot_id}
-            onChange={(v) =>
-              onChange("bot_id", v)
-            }
-            options={bots.map((bot) => ({
-              value: bot.id,
-              label: bot.name
-            }))}
-          />
+          <div className="auth-field">
+            <label>
+              Bot
+            </label>
+
+            <select
+              value={form.bot_id}
+              onChange={(event) =>
+                onChange(
+                  "bot_id",
+                  event.target.value
+                )
+              }
+              required
+            >
+              <option value="">
+                Select bot
+              </option>
+
+              {bots.map((bot) => (
+                <option
+                  key={bot.id}
+                  value={bot.id}
+                >
+                  {bot.name}
+                </option>
+              ))}
+            </select>
+          </div>
 
           <FormField
             label="Label"
             value={form.label}
-            onChange={(v) =>
-              onChange("label", v)
+            onChange={(value) =>
+              onChange(
+                "label",
+                value
+              )
             }
             placeholder="🎬 Movies"
             required
@@ -2594,85 +3338,125 @@ function MenuModal({
           <FormField
             label="Icon"
             value={form.icon}
-            onChange={(v) =>
-              onChange("icon", v)
-            }
-          />
-
-          <SelectField
-            label="Parent"
-            value={form.parent_id}
-            onChange={(v) =>
+            onChange={(value) =>
               onChange(
-                "parent_id",
-                v
+                "icon",
+                value
               )
             }
-            options={[
-              {
-                value: "",
-                label: "Root menu"
-              },
-              ...parents.map((item) => ({
-                value: item.id,
-                label:
-                  `${item.icon || "🔘"} ${item.label}`
-              }))
-            ]}
+            placeholder="🎬"
           />
 
-          <SelectField
-            label="Action Type"
-            value={form.action_type}
-            onChange={(v) =>
-              onChange(
-                "action_type",
-                v
-              )
-            }
-            options={[
-              "category",
-              "bot",
-              "url",
-              "command",
-              "callback",
-              "external"
-            ].map((value) => ({
-              value,
-              label: value
-            }))}
-          />
+          <div className="auth-field">
+            <label>
+              Parent Item
+            </label>
+
+            <select
+              value={
+                form.parent_id
+              }
+              onChange={(event) =>
+                onChange(
+                  "parent_id",
+                  event.target.value
+                )
+              }
+            >
+              <option value="">
+                Root menu item
+              </option>
+
+              {parentOptions.map(
+                (item) => (
+                  <option
+                    key={item.id}
+                    value={item.id}
+                  >
+                    {item.icon ||
+                      "🔘"}{" "}
+                    {item.label}
+                  </option>
+                )
+              )}
+            </select>
+          </div>
+
+          <div className="auth-field">
+            <label>
+              Action Type
+            </label>
+
+            <select
+              value={
+                form.action_type
+              }
+              onChange={(event) =>
+                onChange(
+                  "action_type",
+                  event.target.value
+                )
+              }
+            >
+              <option value="category">
+                category
+              </option>
+              <option value="bot">
+                bot
+              </option>
+              <option value="url">
+                url
+              </option>
+              <option value="command">
+                command
+              </option>
+              <option value="callback">
+                callback
+              </option>
+              <option value="external">
+                external
+              </option>
+            </select>
+          </div>
 
           <FormField
             label="Action Value"
-            value={form.action_value}
-            onChange={(v) =>
+            value={
+              form.action_value
+            }
+            onChange={(value) =>
               onChange(
                 "action_value",
-                v
+                value
               )
             }
+            placeholder="movies"
           />
 
           <FormField
             label="Sort Order"
             type="number"
-            value={form.sort_order}
-            onChange={(v) =>
+            value={
+              form.sort_order
+            }
+            onChange={(value) =>
               onChange(
                 "sort_order",
-                v
+                value
               )
             }
+            placeholder="0"
           />
         </div>
 
         <CheckboxField
-          checked={form.is_active}
-          onChange={(v) =>
+          checked={
+            form.is_active
+          }
+          onChange={(value) =>
             onChange(
               "is_active",
-              v
+              value
             )
           }
           label="Menu item is active"
@@ -2687,7 +3471,7 @@ function MenuModal({
         <ModalActions
           saving={saving}
           onClose={onClose}
-          label={
+          submitLabel={
             mode === "create"
               ? "Create Menu Item"
               : "Save Changes"
@@ -2716,7 +3500,7 @@ function ContentModal({
           ? "Create Content"
           : "Edit Content"
       }
-      subtitle="Manage FINDLY content."
+      subtitle="Create and manage FINDLY content."
       onClose={onClose}
     >
       <form
@@ -2724,92 +3508,138 @@ function ContentModal({
         onSubmit={onSubmit}
       >
         <div className="form-grid">
-          <SelectField
-            label="Bot"
-            value={form.bot_id}
-            onChange={(v) =>
-              onChange("bot_id", v)
-            }
-            options={bots.map((bot) => ({
-              value: bot.id,
-              label: bot.name
-            }))}
-          />
+          <div className="auth-field">
+            <label>
+              Bot
+            </label>
 
-          <SelectField
-            label="Category"
-            value={form.category_id}
-            onChange={(v) =>
-              onChange(
-                "category_id",
-                v
-              )
-            }
-            options={[
-              {
-                value: "",
-                label: "No category"
-              },
-              ...categories.map(
-                (category) => ({
-                  value: category.id,
-                  label:
-                    `${category.icon || "📁"} ${category.name}`
-                })
-              )
-            ]}
-          />
+            <select
+              value={form.bot_id}
+              onChange={(event) =>
+                onChange(
+                  "bot_id",
+                  event.target.value
+                )
+              }
+              required
+            >
+              <option value="">
+                Select bot
+              </option>
+
+              {bots.map((bot) => (
+                <option
+                  key={bot.id}
+                  value={bot.id}
+                >
+                  {bot.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="auth-field">
+            <label>
+              Category
+            </label>
+
+            <select
+              value={
+                form.category_id
+              }
+              onChange={(event) =>
+                onChange(
+                  "category_id",
+                  event.target.value
+                )
+              }
+            >
+              <option value="">
+                No category
+              </option>
+
+              {categories.map(
+                (category) => (
+                  <option
+                    key={category.id}
+                    value={
+                      category.id
+                    }
+                  >
+                    {category.icon ||
+                      "📁"}{" "}
+                    {category.name}
+                  </option>
+                )
+              )}
+            </select>
+          </div>
 
           <FormField
             label="Content Type"
-            value={form.content_type}
-            onChange={(v) =>
+            value={
+              form.content_type
+            }
+            onChange={(value) =>
               onChange(
                 "content_type",
-                v
+                value
               )
             }
+            placeholder="general"
           />
 
           <FormField
             label="Title"
             value={form.title}
-            onChange={(v) =>
-              onChange("title", v)
+            onChange={(value) =>
+              onChange(
+                "title",
+                value
+              )
             }
+            placeholder="Content title"
             required
           />
 
           <FormField
             label="Image URL"
-            value={form.image_url}
-            onChange={(v) =>
+            value={
+              form.image_url
+            }
+            onChange={(value) =>
               onChange(
                 "image_url",
-                v
+                value
               )
             }
+            placeholder="https://..."
           />
 
           <FormField
             label="External URL"
-            value={form.external_url}
-            onChange={(v) =>
+            value={
+              form.external_url
+            }
+            onChange={(value) =>
               onChange(
                 "external_url",
-                v
+                value
               )
             }
+            placeholder="https://..."
           />
 
           <FormField
             label="Published At"
             type="datetime-local"
-            value={form.published_at}
-            onChange={(v) =>
+            value={
+              form.published_at
+            }
+            onChange={(value) =>
               onChange(
                 "published_at",
-                v
+                value
               )
             }
           />
@@ -2817,34 +3647,42 @@ function ContentModal({
 
         <FormField
           label="Description"
-          value={form.description}
-          onChange={(v) =>
+          value={
+            form.description
+          }
+          onChange={(value) =>
             onChange(
               "description",
-              v
+              value
             )
           }
+          placeholder="Content description..."
           textarea
         />
 
         <FormField
           label="Metadata JSON"
-          value={form.metadata}
-          onChange={(v) =>
+          value={
+            form.metadata
+          }
+          onChange={(value) =>
             onChange(
               "metadata",
-              v
+              value
             )
           }
+          placeholder='{"source":"telegram"}'
           textarea
         />
 
         <CheckboxField
-          checked={form.is_active}
-          onChange={(v) =>
+          checked={
+            form.is_active
+          }
+          onChange={(value) =>
             onChange(
               "is_active",
-              v
+              value
             )
           }
           label="Content is active"
@@ -2859,7 +3697,7 @@ function ContentModal({
         <ModalActions
           saving={saving}
           onClose={onClose}
-          label={
+          submitLabel={
             mode === "create"
               ? "Create Content"
               : "Save Changes"
@@ -2903,7 +3741,7 @@ function Modal({
 function ModalActions({
   saving,
   onClose,
-  label
+  submitLabel
 }) {
   return (
     <div className="modal-actions">
@@ -2912,3 +3750,260 @@ function ModalActions({
         type="button"
         onClick={onClose}
         disabled={saving}
+      >
+        Cancel
+      </button>
+
+      <button
+        className="primary-button"
+        type="submit"
+        disabled={saving}
+      >
+        {saving
+          ? "Saving..."
+          : submitLabel}
+      </button>
+    </div>
+  );
+}
+
+function FormField({
+  label,
+  value,
+  onChange,
+  placeholder,
+  type = "text",
+  required = false,
+  textarea = false
+}) {
+  return (
+    <div className="auth-field">
+      <label>
+        {label}
+      </label>
+
+      {textarea ? (
+        <textarea
+          value={value ?? ""}
+          onChange={(event) =>
+            onChange(
+              event.target.value
+            )
+          }
+          placeholder={
+            placeholder
+          }
+          rows={5}
+          required={required}
+        />
+      ) : (
+        <input
+          type={type}
+          value={value ?? ""}
+          onChange={(event) =>
+            onChange(
+              event.target.value
+            )
+          }
+          placeholder={
+            placeholder
+          }
+          required={required}
+        />
+      )}
+    </div>
+  );
+}
+
+function CheckboxField({
+  checked,
+  onChange,
+  label
+}) {
+  return (
+    <label className="checkbox-field">
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={(event) =>
+          onChange(
+            event.target.checked
+          )
+        }
+      />
+
+      <span>{label}</span>
+    </label>
+  );
+}
+
+function BotStatus({ bot }) {
+  return (
+    <StatusBadge
+      active={bot.is_active}
+    />
+  );
+}
+
+function StatusBadge({
+  active
+}) {
+  return (
+    <div
+      className={
+        "status " +
+        (active
+          ? "online"
+          : "offline")
+      }
+    >
+      <span />
+      {active
+        ? "Active"
+        : "Paused"}
+    </div>
+  );
+}
+
+function SystemPanel({
+  bots,
+  activeBots
+}) {
+  return (
+    <section className="panel system-panel">
+      <div className="panel-header">
+        <div>
+          <h2>
+            System Status
+          </h2>
+
+          <p>
+            Current FINDLY infrastructure
+          </p>
+        </div>
+      </div>
+
+      <div className="system-grid">
+        <SystemItem
+          label="Cloudflare API"
+          value="Connected"
+        />
+
+        <SystemItem
+          label="Supabase"
+          value="Connected"
+        />
+
+        <SystemItem
+          label="Database"
+          value="Connected"
+        />
+
+        <SystemItem
+          label="Active Bots"
+          value={`${activeBots}/${bots.length}`}
+        />
+      </div>
+    </section>
+  );
+}
+
+function StatCard({
+  icon,
+  label,
+  value
+}) {
+  return (
+    <div className="stat-card">
+      <div className="stat-icon">
+        {icon}
+      </div>
+
+      <div>
+        <span>{label}</span>
+        <strong>
+          {value}
+        </strong>
+      </div>
+    </div>
+  );
+}
+
+function SystemItem({
+  label,
+  value
+}) {
+  return (
+    <div className="system-item">
+      <div>
+        <strong>
+          {label}
+        </strong>
+
+        <small>
+          {value}
+        </small>
+      </div>
+
+      <span className="system-dot" />
+    </div>
+  );
+}
+
+function ComingSoonSection({
+  section
+}) {
+  return (
+    <section className="panel coming-soon">
+      <div className="coming-icon">
+        ⚙️
+      </div>
+
+      <h2>
+        {section}
+      </h2>
+
+      <p>
+        This module is reserved for
+        the next implementation batch.
+      </p>
+    </section>
+  );
+}
+
+function getCategoryNameLocal(
+  categories,
+  categoryId
+) {
+  if (!categoryId) {
+    return "No category";
+  }
+
+  return (
+    categories.find(
+      (category) =>
+        category.id === categoryId
+    )?.name || "Unknown"
+  );
+}
+
+function formatDate(value) {
+  if (!value) {
+    return "—";
+  }
+
+  const date =
+    new Date(value);
+
+  if (
+    Number.isNaN(
+      date.getTime()
+    )
+  ) {
+    return "—";
+  }
+
+  return date.toLocaleString();
+}
+
+export default App;
